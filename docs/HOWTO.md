@@ -213,7 +213,22 @@ When a *tracked* file with changes is selected, every hunk header in the diff sh
 * **Stage hunk** (in the unstaged list) / **Unstage hunk** (in the staged list) – moves only that hunk to/from the index. The diff reloads showing the remaining hunks, and the file now appears in both lists if parts remain in each.
 * **Discard hunk** – permanently reverts just that hunk in the working tree (asks for confirmation).
 
-This lets you split unrelated edits in one file into separate, clean commits. (Hunk actions are not available for untracked files, because git has nothing to patch yet.)
+This lets you split unrelated edits in one file into separate, clean commits. (To go finer than a hunk, see *Staging individual lines* below.) (Hunk and line actions are not available for untracked files, because git has nothing to patch yet.)
+
+### Staging individual lines
+
+![Selecting a single changed line](images/line-staging.png)
+
+For the finest control, stage just some lines of a change:
+
+1. Select a tracked file with changes in *Unstaged changes* (or in *Staged changes* to unstage lines).
+2. In the diff, **click the changed lines** (green `+` or red `−`) you want. Clicking toggles a line; **Shift+click** selects a range and **Ctrl+click** adds or removes single lines. You can select lines from several hunks at once. Context (unchanged) lines can be selected but are ignored.
+3. A strip above the diff shows how many changed lines are selected. Click **Stage selected lines** (or **Unstage selected lines** when viewing a staged file) — only those lines move to the index. The diff reloads with what is left.
+4. **Discard selected lines** permanently reverts just those lines in your working file (asks for confirmation).
+
+Example: you added three lines `NEW1`, `NEW2`, `NEW3` but only want `NEW2` in this commit: select that one line and stage it; `NEW1` and `NEW3` stay in your working tree, still unstaged.
+
+Notes: line selection works in the **unified** view (the strip is hidden in side-by-side mode, which is read-only for selection), and not for untracked files.
 
 ### Committing
 
@@ -384,7 +399,7 @@ Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete u
 
 * Interactive rebase (reordering/squashing/editing commits in a todo list) is not available; plain rebase onto a branch is. A rebase started elsewhere is recognized and can be continued or aborted.
 * Conflicts are resolved per file (take a side, or edit in your editor); there is no built-in three-way merge editor.
-* Staging works per file and per hunk; line-by-line selection inside a hunk is not available.
+* Staging works per file, per hunk and per selected line (unified view only; not for untracked files).
 * Diffs highlight changes but have no language syntax coloring yet. In side-by-side mode lines are paired by position, so when a block changes many lines the pairs can look offset.
 * The history view loads a limited number of commits (2000 by default; see Settings).
 * Submodules, plugins, shell integration and localization are not implemented yet (see `docs/PORTING.md`).

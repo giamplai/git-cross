@@ -211,6 +211,14 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnDiffSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ListBox lb)
+        {
+            _vm.SetDiffSelection(lb.SelectedItems?.OfType<Core.Diff.DiffLine>().ToList() ?? []);
+        }
+    }
+
     private static string? PathOf(object? sender) => (sender as Control)?.DataContext is Core.Models.FileChange f ? f.Path : null;
 
     private async void OnBlameCommitFile(object? s, RoutedEventArgs e)

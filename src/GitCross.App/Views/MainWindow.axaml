@@ -347,8 +347,17 @@
                   <TextBlock Text="{Binding DiffTitle, FallbackValue=Changes}" Classes="mono" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                 </DockPanel>
               </Border>
+              <Border x:Name="LineActionsBar" DockPanel.Dock="Top" IsVisible="{Binding LineActionsVisible}" Padding="12,4" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource LineBrush}">
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                    <Button Classes="mini" Content="{Binding LinePrimaryText}" Command="{Binding LinePrimaryCommand}" />
+                    <Button Classes="mini" Content="Discard selected lines" Command="{Binding LineDiscardCommand}" />
+                  </StackPanel>
+                  <TextBlock Text="{Binding LineSelectionText}" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                </DockPanel>
+              </Border>
               <Grid>
-                <ListBox Classes="diff" ItemsSource="{Binding Diff}" SelectionMode="Multiple" ScrollViewer.HorizontalScrollBarVisibility="Auto" IsVisible="{Binding ShowUnified}">
+                <ListBox x:Name="UnifiedDiffList" Classes="diff" ItemsSource="{Binding Diff}" SelectionMode="Multiple" SelectionChanged="OnDiffSelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Auto" IsVisible="{Binding ShowUnified}">
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="d:DiffLine">
                       <Grid ColumnDefinitions="48,48,18,*" Background="{Binding Kind, Converter={x:Static c:Converters.DiffBackground}}" Opacity="{Binding Kind, Converter={x:Static c:Converters.DiffOpacity}}">

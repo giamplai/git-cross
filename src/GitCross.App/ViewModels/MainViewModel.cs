@@ -118,6 +118,7 @@ public partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(IsUnifiedView));
             OnPropertyChanged(nameof(ShowSplit));
             OnPropertyChanged(nameof(ShowUnified));
+            OnPropertyChanged(nameof(LineActionsVisible));
             RebuildSplit();
             SaveSettings();
         }
@@ -638,6 +639,57 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasDiff));
         OnPropertyChanged(nameof(ShowSplit));
         OnPropertyChanged(nameof(ShowUnified));
+        OnPropertyChanged(nameof(LineActionsVisible));
+    }
+
+    private Dictionary<int, ISet<int>> _lineSelection = [];
+
+    public int SelectedChangeCount => _lineSelection.Values.Sum(v => v.Count);
+    public bool LineActionsVisible => HunkActionsEnabled && ShowUnified;
+    public string LineSelectionText => SelectedChangeCount == 0
+        ? "Click changed lines (Shift/Ctrl for several) to stage or discard just those lines"
+        : $"{SelectedChangeCount} changed line{(SelectedChangeCount == 1 ? "" : "s")} selected";
+    public string LinePrimaryText => _diffSource == DiffSource.Staged ? "Unstage selected lines" : "Stage selected lines";
+
+    /// <summary>Called by the view whenever the highlighted rows of the unified diff change.</summary>
+    public void SetDiffSelection(IEnumerable<DiffLine> selected)
+    {
+        var map = new Dictionary<int, ISet<int>>();
+        foreach (var l in selected.Where(l => l.Kind is DiffLineKind.Added or DiffLineKind.Removed && l.BodyIndex >= 0))
+        {
+            if (!map.TryGetValue(l.HunkIndex, out var set))
+            {
+                map[l.HunkIndex] = set = new HashSet<int>();
+            }
+
+            set.Add(l.BodyIndex);
+        }
+
+        _lineSelection = map;
+        OnPropertyChanged(nameof(SelectedChangeCount));
+        OnPropertyChanged(nameof(LineSelectionText));
+        LinePrimaryCommand.NotifyCanExecuteChanged();
+        LineDiscardCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool HasLineSelection => SelectedChangeCount > 0;
+
+    [RelayCommand(CanExecute = nameof(HasLineSelection))]
+    private Task LinePrimaryAsync()
+    {
+        var sel = _lineSelection;
+        var unstage = _diffSource == DiffSource.Staged;
+        return HunkActionAsync(r => r.StageLinesAsync(_diffPath!, sel, unstage));
+    }
+
+    [RelayCommand(CanExecute = nameof(HasLineSelection))]
+    private async Task LineDiscardAsync()
+    {
+        var sel = _lineSelection;
+        if (await ConfirmAsync("Discard lines", $"Permanently discard {SelectedChangeCount} selected line(s) in {_diffPath}?"))
+        {
+            await HunkActionAsync(r => r.DiscardLinesAsync(_diffPath!, sel));
+        }
     }
 
     private void NotifyHunkState()
@@ -645,6 +697,8 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HunkActionsEnabled));
         OnPropertyChanged(nameof(CanDiscardHunk));
         OnPropertyChanged(nameof(HunkPrimaryText));
+        OnPropertyChanged(nameof(LineActionsVisible));
+        OnPropertyChanged(nameof(LinePrimaryText));
     }
 
     [RelayCommand]

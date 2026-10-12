@@ -11,7 +11,7 @@
 | Stage / unstage / commit / amend | Done | file-level only |
 | Fetch / Pull / Push | Done | no progress output, no credentials UI |
 | Stash push/pop/apply/drop + list | Done | sidebar section, context menu; untracked files in a stash are not shown |
-| Hunk staging (stage/unstage/discard hunk) | Done | line-level selection still Todo |
+| Hunk and line staging (stage/unstage/discard) | Done | line selection in unified view only |
 | Themes (system/light/dark) | Done | persisted |
 | Settings dialog | Done | git path, identity, pull mode, history size |
 | Clone / init | Done | clone dialog, init via folder picker |

@@ -318,11 +318,52 @@ public class WindowRenderTests
         vm.IsSplitView = true;
         await Settle();
         Assert.True(vm.ShowSplit);
+        Assert.False(w.FindControl<Control>("LineActionsBar")!.IsEffectivelyVisible, "line selection is unified-view only");
         Assert.NotEmpty(vm.SplitRows);
         Shot(w, "diff-split.png");
 
         // the choice is remembered across restarts
         Assert.True(new SettingsStore(settingsPath).Load().SplitDiff);
+    }
+
+    [AvaloniaFact]
+    public async Task Selected_lines_can_be_staged_individually()
+    {
+        var repo = NewRepo();
+        File.WriteAllText(Path.Combine(repo, "list.txt"), "a\nb\nc\nd\n");
+        Git(repo, "add ."); Git(repo, "commit -qm list");
+        File.WriteAllText(Path.Combine(repo, "list.txt"), "a\nb\nNEW1\nNEW2\nNEW3\nc\nd\n");
+
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        var w = new MainWindow(vm);
+        w.Show();
+        await vm.OpenAsync(repo);
+        vm.SelectedItem = vm.Items[0];
+        await Settle();
+        vm.SelectedUnstaged = vm.Unstaged.Single(x => x.Path == "list.txt");
+        await Settle();
+        Assert.True(vm.LineActionsVisible);
+        Assert.True(w.FindControl<Control>("LineActionsBar")!.IsEffectivelyVisible, "the line-action strip must actually be shown");
+        Assert.False(vm.LinePrimaryCommand.CanExecute(null)); // nothing selected yet
+
+        // select through the real ListBox so the view wiring is exercised too
+        var list = w.FindControl<ListBox>("UnifiedDiffList")!;
+        list.SelectedItems!.Add(vm.Diff.Single(l => l.Text == "NEW2"));
+        await Settle();
+        Assert.Equal(1, vm.SelectedChangeCount);
+        Assert.Equal("1 changed line selected", vm.LineSelectionText);
+        Shot(w, "line-staging.png");
+
+        await vm.LinePrimaryCommand.ExecuteAsync(null);
+        await Settle();
+
+        var staged = Process.Start(new ProcessStartInfo("git", "show :list.txt") { WorkingDirectory = repo, RedirectStandardOutput = true })!;
+        var content = staged.StandardOutput.ReadToEnd().Replace("\r\n", "\n");
+        staged.WaitForExit();
+        Assert.Equal("a\nb\nNEW2\nc\nd\n", content);
+        Assert.Contains(vm.Staged, f => f.Path == "list.txt");
+        Assert.Contains(vm.Unstaged, f => f.Path == "list.txt");
+        Assert.Equal(2, vm.Diff.Count(l => l.Kind == Core.Diff.DiffLineKind.Added)); // NEW1 and NEW3 remain unstaged
     }
 
     private static string NewRepo()
