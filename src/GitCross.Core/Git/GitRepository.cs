@@ -1,3 +1,4 @@
+using GitCross.Core.Blame;
 using GitCross.Core.Diff;
 using GitCross.Core.Models;
 
@@ -69,6 +70,19 @@ public sealed class GitRepository
 
         var r = await _git.RunAsync(a, null, default);
         return r.Success ? Parsers.ParseLog(r.StdOut).ToList() : []; // empty repo => no commits
+    }
+
+    /// <summary>Per-line authorship of <paramref name="path"/> at <paramref name="rev"/> (null = work tree).</summary>
+    public async Task<IReadOnlyList<BlameLine>> GetBlameAsync(string path, string? rev = null)
+        => BlameParser.Parse(await _git.OutAsync(rev is null
+            ? ["blame", "--porcelain", "--", path]
+            : ["blame", "--porcelain", rev, "--", path]));
+
+    /// <summary>Commits touching one file, following renames.</summary>
+    public async Task<IReadOnlyList<Commit>> GetFileLogAsync(string path, int max = 2000)
+    {
+        var r = await _git.RunAsync(["log", "--follow", $"--max-count={max}", $"--format={Parsers.LogFormat}", "--", path], null, default);
+        return r.Success ? Parsers.ParseLog(r.StdOut).ToList() : [];
     }
 
     public async Task<IReadOnlyList<GitRef>> GetRefsAsync()
