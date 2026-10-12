@@ -274,6 +274,18 @@
                         <TextBlock Grid.Column="1" Text="{Binding NewNumber, Converter={x:Static c:Converters.LineNumber}}" Classes="mono muted" TextAlignment="Right" Margin="0,0,8,0" />
                         <TextBlock Grid.Column="2" Text="{Binding Kind, Converter={x:Static c:Converters.DiffSign}}" Classes="mono" />
                         <TextBlock Grid.Column="3" Text="{Binding Text}" Classes="mono" />
+                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" Margin="0,1,12,1">
+                          <StackPanel.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                              <Binding Path="IsHunk" />
+                              <Binding Path="#Root.((vm:MainViewModel)DataContext).HunkActionsEnabled" />
+                            </MultiBinding>
+                          </StackPanel.IsVisible>
+                          <Button Classes="mini" Content="{Binding #Root.((vm:MainViewModel)DataContext).HunkPrimaryText}"
+                                  Command="{Binding #Root.((vm:MainViewModel)DataContext).HunkPrimaryCommand}" CommandParameter="{Binding HunkIndex}" />
+                          <Button Classes="mini" Content="Discard hunk" IsVisible="{Binding #Root.((vm:MainViewModel)DataContext).CanDiscardHunk}"
+                                  Command="{Binding #Root.((vm:MainViewModel)DataContext).HunkDiscardCommand}" CommandParameter="{Binding HunkIndex}" />
+                        </StackPanel>
                       </Grid>
                     </DataTemplate>
                   </ListBox.ItemTemplate>

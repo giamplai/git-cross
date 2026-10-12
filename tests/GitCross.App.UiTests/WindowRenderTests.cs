@@ -128,4 +128,38 @@ public class WindowRenderTests
         await vm.ResetToAsync(vm.Items.Last().Commit!.Sha, Core.Git.ResetMode.Mixed);
         Assert.True(vm.Items.Count(i => !i.IsWorkingDir) < before);
     }
+
+    [AvaloniaFact]
+    public async Task Hunk_staging_moves_one_hunk_to_the_index()
+    {
+        var repo = MakeRepo();
+        var f = Path.Combine(repo, "big.txt");
+        File.WriteAllText(f, string.Join("\n", Enumerable.Range(1, 30).Select(i => $"line{i}")) + "\n");
+        Git(repo, "add big.txt"); Git(repo, "commit -qm big");
+        File.WriteAllText(f, string.Join("\n", Enumerable.Range(1, 30).Select(i => i is 2 or 28 ? $"CHANGED{i}" : $"line{i}")) + "\n");
+
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        var w = new MainWindow(vm);
+        w.Show();
+        await vm.OpenAsync(repo);
+        vm.SelectedItem = vm.Items[0];
+        await Settle();
+        vm.SelectedUnstaged = vm.Unstaged.First(x => x.Path == "big.txt");
+        await Settle();
+        Assert.True(vm.HunkActionsEnabled);
+        Shot(w, "06-hunks.png");
+
+        vm.HunkPrimaryCommand.Execute(1);
+        await Settle();
+        Assert.Contains(vm.Staged, x => x.Path == "big.txt");
+        Assert.Contains(vm.Unstaged, x => x.Path == "big.txt"); // the other hunk is still unstaged
+        Assert.Equal(1, vm.Diff.Count(l => l.IsHunk)); // diff reloaded with the remaining hunk
+    }
+
+    private static void Git(string dir, string args)
+    {
+        var psi = new ProcessStartInfo("git", args) { WorkingDirectory = dir, RedirectStandardError = true, RedirectStandardOutput = true };
+        using var p = Process.Start(psi)!;
+        p.WaitForExit();
+    }
 }

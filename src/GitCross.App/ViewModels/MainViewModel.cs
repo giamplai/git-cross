@@ -11,6 +11,8 @@ using GitCross.Core.Util;
 
 namespace GitCross.App.ViewModels;
 
+public enum DiffSource { None, Commit, Unstaged, Staged }
+
 public partial class MainViewModel : ObservableObject
 {
     private const int MaxLanesShown = 12;
@@ -21,6 +23,8 @@ public partial class MainViewModel : ObservableObject
     private List<HistoryItem> _allItems = [];
     private IReadOnlyList<GitRef> _refs = [];
     private int _busy;
+    private DiffSource _diffSource;
+    private string? _diffPath;
     private int _version; // guards against out-of-order async results
 
     public MainViewModel(SettingsStore? store = null)
@@ -59,6 +63,9 @@ public partial class MainViewModel : ObservableObject
     public string StagedHeader => $"Staged changes ({Staged.Count})";
     public int SummaryLength => CommitMessage.Split('\n')[0].Length;
     public bool HasDiff => Diff.Count > 0;
+    public bool HunkActionsEnabled => _diffSource is DiffSource.Unstaged or DiffSource.Staged;
+    public bool CanDiscardHunk => _diffSource == DiffSource.Unstaged;
+    public string HunkPrimaryText => _diffSource == DiffSource.Staged ? "Unstage hunk" : "Stage hunk";
     public string ThemeLabel => _settings.Theme switch { "Light" => "☀ Light", "Dark" => "🌙 Dark", _ => "◐ System" };
 
     public ObservableCollection<HistoryItem> Items { get; } = [];
@@ -68,6 +75,12 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<FileChange> Staged { get; } = [];
     public ObservableCollection<DiffLine> Diff { get; } = [];
     public ObservableCollection<RecentRepo> Recent { get; } = [];
+
+    /// <summary>Supplied by the view to ask before destructive actions (title, message → confirmed). Unset = proceed.</summary>
+    public Func<string, string, Task<bool>>? Confirm { get; set; }
+
+    private async Task<bool> ConfirmAsync(string title, string message)
+        => Confirm is null || await Confirm(title, message);
 
     public string? RepoRoot => _repo?.Root;
 
@@ -353,7 +366,7 @@ public partial class MainViewModel : ObservableObject
     {
         if (value is not null && SelectedItem?.Commit is { } c)
         {
-            _ = ShowDiffAsync(value.Path, () => _repo!.GetCommitDiffAsync(c.Sha, value.Path));
+            _ = ShowDiffAsync(DiffSource.Commit, value.Path, () => _repo!.GetCommitDiffAsync(c.Sha, value.Path));
         }
     }
 
@@ -365,7 +378,8 @@ public partial class MainViewModel : ObservableObject
         }
 
         SelectedStaged = null;
-        _ = ShowDiffAsync(value.Path, () => _repo!.GetWorkingDiffAsync(value.Path, false, value.Kind == ChangeKind.Untracked));
+        var untracked = value.Kind == ChangeKind.Untracked;
+        _ = ShowDiffAsync(untracked ? DiffSource.Commit : DiffSource.Unstaged, value.Path, () => _repo!.GetWorkingDiffAsync(value.Path, false, untracked));
     }
 
     partial void OnSelectedStagedChanged(FileChange? value)
@@ -376,16 +390,19 @@ public partial class MainViewModel : ObservableObject
         }
 
         SelectedUnstaged = null;
-        _ = ShowDiffAsync(value.Path, () => _repo!.GetWorkingDiffAsync(value.Path, true));
+        _ = ShowDiffAsync(DiffSource.Staged, value.Path, () => _repo!.GetWorkingDiffAsync(value.Path, true));
     }
 
     partial void OnCommitMessageChanged(string value) => OnPropertyChanged(nameof(SummaryLength));
 
-    private async Task ShowDiffAsync(string title, Func<Task<string>> load)
+    private async Task ShowDiffAsync(DiffSource source, string title, Func<Task<string>> load)
     {
         var v = ++_version;
         Diff.Clear();
         DiffTitle = title;
+        _diffSource = source;
+        _diffPath = title;
+        NotifyHunkState();
         await Guard(async () =>
         {
             var text = await load();
@@ -399,6 +416,49 @@ public partial class MainViewModel : ObservableObject
         });
     }
 
+    private void NotifyHunkState()
+    {
+        OnPropertyChanged(nameof(HunkActionsEnabled));
+        OnPropertyChanged(nameof(CanDiscardHunk));
+        OnPropertyChanged(nameof(HunkPrimaryText));
+    }
+
+    [RelayCommand]
+    private Task HunkPrimaryAsync(int hunk)
+        => HunkActionAsync(r => r.StageHunkAsync(_diffPath!, hunk, unstage: _diffSource == DiffSource.Staged));
+
+    [RelayCommand]
+    private async Task HunkDiscardAsync(int hunk)
+    {
+        if (await ConfirmAsync("Discard hunk", $"Permanently discard this change in {_diffPath}?"))
+        {
+            await HunkActionAsync(r => r.DiscardHunkAsync(_diffPath!, hunk));
+        }
+    }
+
+    private async Task HunkActionAsync(Func<GitRepository, Task> action)
+    {
+        if (_repo is not { } repo || _diffPath is not { } path || !HunkActionsEnabled)
+        {
+            return;
+        }
+
+        var source = _diffSource;
+        await Mutate(() => action(repo), true);
+
+        // Reselect the same file so its (shorter) diff reappears; fall back to the other list.
+        var inFirst = source == DiffSource.Staged ? Staged : Unstaged;
+        var inOther = source == DiffSource.Staged ? Unstaged : Staged;
+        if (inFirst.FirstOrDefault(f => f.Path == path) is { } f1)
+        {
+            if (source == DiffSource.Staged) { SelectedStaged = f1; } else { SelectedUnstaged = f1; }
+        }
+        else if (inOther.FirstOrDefault(f => f.Path == path) is { } f2)
+        {
+            if (source == DiffSource.Staged) { SelectedUnstaged = f2; } else { SelectedStaged = f2; }
+        }
+    }
+
     [RelayCommand] private Task StageAsync(FileChange? f) => Mutate(() => _repo!.StageAsync([f!.Path]), f);
 
     [RelayCommand] private Task UnstageAsync(FileChange? f) => Mutate(() => _repo!.UnstageAsync([f!.Path]), f);
@@ -408,10 +468,15 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand] private Task UnstageAllAsync() => Mutate(() => _repo!.UnstageAsync(Staged.Select(u => u.Path).ToList()), Staged.Count > 0);
 
     [RelayCommand]
-    private Task DiscardAsync(FileChange? f)
-        => f is null || f.Kind == ChangeKind.Untracked
-            ? Task.CompletedTask // never delete untracked files from a button click
-            : Mutate(() => _repo!.DiscardAsync([f.Path]), f);
+    private async Task DiscardAsync(FileChange? f)
+    {
+        // Never delete untracked files from a button click.
+        if (f is not null && f.Kind != ChangeKind.Untracked
+            && await ConfirmAsync("Discard changes", $"Permanently discard all unstaged changes in {f.Path}?"))
+        {
+            await Mutate(() => _repo!.DiscardAsync([f.Path]), f);
+        }
+    }
 
     [RelayCommand]
     private async Task CommitAsync()

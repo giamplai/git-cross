@@ -11,7 +11,7 @@
 | Stage / unstage / commit / amend | Done | file-level only |
 | Fetch / Pull / Push | Done | no progress output, no credentials UI |
 | Stash push/pop | Done | no stash list |
-| Hunk/line staging | Todo | |
+| Hunk staging (stage/unstage/discard hunk) | Done | line-level selection still Todo |
 | Themes (system/light/dark) | Done | persisted |
 | Settings dialog | Todo | |
 | Clone / init | Done | clone dialog, init via folder picker |

@@ -6,7 +6,10 @@ namespace GitCross.Core.Diff;
 public enum DiffLineKind { Meta, Hunk, Added, Removed, Context }
 
 /// <param name="HunkIndex">Zero-based hunk this line belongs to (hunk header included); -1 for file header lines.</param>
-public sealed record DiffLine(DiffLineKind Kind, string Text, int? OldNumber, int? NewNumber, int HunkIndex = -1);
+public sealed record DiffLine(DiffLineKind Kind, string Text, int? OldNumber, int? NewNumber, int HunkIndex = -1)
+{
+    public bool IsHunk => Kind == DiffLineKind.Hunk;
+}
 
 /// <summary>Parses unified diff text (as printed by git) into numbered lines.</summary>
 public static partial class DiffParser

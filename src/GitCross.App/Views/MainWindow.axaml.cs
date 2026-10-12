@@ -22,6 +22,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         _vm.ApplySavedTheme();
         DataContext = _vm;
+        _vm.Confirm = async (title, message) => await PromptWindow.AskAsync(this, title, message, "Discard") is not null;
 
         KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.F, KeyModifiers.Control), Command = new FocusSearchCommand(SearchBox) });
 
