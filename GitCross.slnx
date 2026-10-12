@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GitCross.App/GitCross.App.csproj" />
+    <Project Path="src/GitCross.Core/GitCross.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GitCross.Core.Tests/GitCross.Core.Tests.csproj" />
+  </Folder>
+</Solution>
