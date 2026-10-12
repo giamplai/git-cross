@@ -42,7 +42,7 @@ public partial class MainWindow : Window
         {
             if (_vm.HasRepo && !_vm.IsBusy)
             {
-                await _vm.RefreshAsync();
+                await _vm.RefreshSilentAsync();
             }
         };
     }

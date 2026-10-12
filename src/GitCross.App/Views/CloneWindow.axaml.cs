@@ -15,6 +15,13 @@ public partial class CloneWindow : Window
     {
         InitializeComponent();
         ParentBox.Text = lastDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Avalonia.Input.Key.Escape)
+            {
+                Close(null);
+            }
+        };
         UrlBox.TextChanged += (_, _) => UpdateTarget();
         ParentBox.TextChanged += (_, _) => UpdateTarget();
         UpdateTarget();

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -46,7 +47,7 @@ public class WindowRenderTests
         return dir;
     }
 
-    private static void Shot(MainWindow w, string name)
+    private static void Shot(Window w, string name)
     {
         using var fs = File.Create(Path.Combine(OutDir, name));
         w.CaptureRenderedFrame()!.Save(fs, new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
@@ -68,7 +69,7 @@ public class WindowRenderTests
         var w = new MainWindow(new MainViewModel(settings));
         w.Show();
         await Settle();
-        Shot(w, "01-welcome.png");
+        Shot(w, "welcome.png");
         Assert.False(((MainViewModel)w.DataContext!).HasRepo);
     }
 
@@ -91,22 +92,28 @@ public class WindowRenderTests
         Assert.NotEmpty(vm.CommitFiles);
         Assert.Contains("commits", vm.StatusText);
         Assert.False(vm.IsError);
-        Shot(w, "02-history.png");
+        Shot(w, "history.png");
 
         vm.SelectedItem = vm.Items[0];
         await Settle();
         vm.SelectedUnstaged = vm.Unstaged.First(f => f.Path == "a.txt");
         await Settle();
         Assert.NotEmpty(vm.Diff);
-        Shot(w, "03-commit.png");
+        Shot(w, "commit-tab.png");
+
+        vm.SearchText = "login";
+        await Settle();
+        Shot(w, "search.png");
+        vm.SearchText = "";
+        await Settle();
 
         vm.CycleThemeCommand.Execute(null); // System -> Light
         vm.CycleThemeCommand.Execute(null); // Light -> Dark
         await Settle();
-        Shot(w, "04-commit-dark.png");
+        Shot(w, "commit-dark.png");
         vm.SelectedItem = vm.Items[1];
         await Settle();
-        Shot(w, "05-history-dark.png");
+        Shot(w, "history-dark.png");
 
         vm.SearchText = "login";
         await Settle();
@@ -147,7 +154,7 @@ public class WindowRenderTests
         vm.SelectedUnstaged = vm.Unstaged.First(x => x.Path == "big.txt");
         await Settle();
         Assert.True(vm.HunkActionsEnabled);
-        Shot(w, "06-hunks.png");
+        Shot(w, "hunks.png");
 
         vm.HunkPrimaryCommand.Execute(1);
         await Settle();
@@ -172,7 +179,7 @@ public class WindowRenderTests
         vm.SelectedSidebar = entry;
         await Settle();
         Assert.Contains(vm.CommitFiles, f => f.Path == "a.txt");
-        Shot(w, "07-stash.png");
+        Shot(w, "stash.png");
 
         await vm.StashDropAsync(entry.Stash!);
         Assert.DoesNotContain(vm.Sidebar, e => e.IsStash);
@@ -192,13 +199,13 @@ public class WindowRenderTests
         Assert.Equal(2, vm.SelectedTab);
         Assert.NotEmpty(vm.BlameRows);
         Assert.True(vm.BlameRows[0].ShowMeta);
-        Shot(w, "08-blame.png");
+        Shot(w, "blame.png");
 
         await vm.ShowFileHistoryAsync("login.cs");
         await Settle();
         Assert.True(vm.HasFileFilter);
         Assert.Equal(["Add login screen"], vm.Items.Select(i => i.Subject));
-        Shot(w, "09-file-history.png");
+        Shot(w, "file-history.png");
 
         await vm.ShowCommitAsync(vm.Items[0].Commit!.Sha);
         Assert.False(vm.HasFileFilter);
@@ -230,7 +237,7 @@ public class WindowRenderTests
         vm.SelectedUnstaged = vm.Unstaged.Single();
         await Settle();
         Assert.Contains(vm.Diff, l => l.Kind == Core.Diff.DiffLineKind.Added && l.Text == "topic");
-        Shot(w, "10-conflict.png");
+        Shot(w, "conflict.png");
 
         await vm.ResolveAsync(vm.Unstaged.Single(), ours: false);
         await Settle();
@@ -246,5 +253,22 @@ public class WindowRenderTests
         var psi = new ProcessStartInfo("git", args) { WorkingDirectory = dir, RedirectStandardError = true, RedirectStandardOutput = true };
         using var p = Process.Start(psi)!;
         p.WaitForExit();
+    }
+
+    [AvaloniaFact]
+    public async Task Dialogs_render()
+    {
+        var clone = new CloneWindow("/path/to/projects");
+        clone.Show();
+        clone.FindControl<TextBox>("UrlBox")!.Text = "https://github.com/gitextensions/gitextensions.git";
+        await Settle();
+        Shot(clone, "clone-dialog.png");
+        clone.Close();
+
+        var confirm = new PromptWindow("Hard reset", "Move the current branch to 1b39b6d and DISCARD all uncommitted changes? This cannot be undone.", "Hard reset", false);
+        confirm.Show();
+        await Settle();
+        Shot(confirm, "confirm-dialog.png");
+        confirm.Close();
     }
 }

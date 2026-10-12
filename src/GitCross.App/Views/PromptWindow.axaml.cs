@@ -23,6 +23,13 @@ public partial class PromptWindow : Window
         _needsInput = needsInput;
         Input.IsVisible = needsInput;
         Input.PlaceholderText = watermark;
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Avalonia.Input.Key.Escape)
+            {
+                Close(null);
+            }
+        };
         Opened += (_, _) => (needsInput ? Input : (Control)Ok).Focus();
     }
 

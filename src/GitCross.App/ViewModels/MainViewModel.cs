@@ -267,7 +267,12 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public async Task RefreshAsync()
+    public Task RefreshAsync() => RefreshCoreAsync(silent: false);
+
+    /// <summary>Refresh triggered in the background (window activation): never replaces an error the user has not seen yet.</summary>
+    public Task RefreshSilentAsync() => RefreshCoreAsync(silent: true);
+
+    private async Task RefreshCoreAsync(bool silent)
     {
         if (_repo is not { } repo)
         {
@@ -304,6 +309,11 @@ public partial class MainViewModel : ObservableObject
             BuildHistory(commits, refs, status);
             BuildSidebar(refs);
             ApplyFilter(keep);
+
+            if (silent && IsError)
+            {
+                return;
+            }
 
             IsError = false;
             StatusText = $"{commits.Count} commits  ·  {Staged.Count} staged  ·  {Unstaged.Count} unstaged";

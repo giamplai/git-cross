@@ -7,6 +7,8 @@ A cross-platform (Linux · macOS · Windows) take on [GitExtensions](https://git
 dotnet run --project src/GitCross.App -- /path/to/repo   # needs .NET 10 SDK and git
 scripts/check.sh                                       # build + tests
 ```
+**User guide with screenshots: [docs/HOWTO.md](docs/HOWTO.md)**
+
 Docs: [architecture](docs/ARCHITECTURE.md) · [porting map](docs/PORTING.md) · [roadmap](ROADMAP.md) · [contributing](CONTRIBUTING.md)
 
 Licensed GPL-3.0, like upstream.
