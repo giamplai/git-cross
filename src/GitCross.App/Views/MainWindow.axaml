@@ -30,7 +30,14 @@
           <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding HasRepo}">
             <Button Classes="tool" Content="⟳  Refresh" Command="{Binding RefreshCommand}" HotKey="F5" />
             <Button Classes="tool" Content="⇩  Fetch" Command="{Binding FetchCommand}" />
-            <Button Classes="tool" Content="⤓  Pull" Command="{Binding PullCommand}" />
+            <SplitButton Classes="tool" Content="⤓  Pull" Command="{Binding PullCommand}">
+              <SplitButton.Flyout>
+                <MenuFlyout>
+                  <MenuItem Header="Pull (merge)" Command="{Binding PullCommand}" />
+                  <MenuItem Header="Pull (rebase)" Command="{Binding PullRebaseCommand}" />
+                </MenuFlyout>
+              </SplitButton.Flyout>
+            </SplitButton>
             <Button Classes="tool" Content="⤒  Push" Command="{Binding PushCommand}" />
             <Button Classes="tool" Content="Stash" Command="{Binding StashCommand}" />
             <Button Classes="tool" Content="Pop" Command="{Binding StashPopCommand}" />
@@ -101,6 +108,9 @@
                       <ContextMenu>
                         <MenuItem Header="Checkout" Click="OnSidebarCheckout" IsVisible="{Binding IsRefItem}" />
                         <MenuItem Header="Merge into current branch" Click="OnSidebarMerge" IsVisible="{Binding IsRefItem}" />
+                        <MenuItem Header="Merge (always create merge commit)" Click="OnSidebarMergeNoFf" IsVisible="{Binding IsRefItem}" />
+                        <MenuItem Header="Merge (squash into staged changes)" Click="OnSidebarMergeSquash" IsVisible="{Binding IsRefItem}" />
+                        <MenuItem Header="Rebase current branch onto this" Click="OnSidebarRebase" IsVisible="{Binding IsRefItem}" />
                         <MenuItem Header="Delete branch" Click="OnSidebarDelete" IsVisible="{Binding IsRefItem}" />
                         <MenuItem Header="Apply stash (keep)" Click="OnStashApply" IsVisible="{Binding IsStash}" />
                         <MenuItem Header="Pop stash (apply and drop)" Click="OnStashPop" IsVisible="{Binding IsStash}" />

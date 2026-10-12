@@ -248,6 +248,52 @@ public class WindowRenderTests
         Assert.Contains(vm.Items, i => i.Subject.StartsWith("Merge"));
     }
 
+    private static string NewRepo()
+    {
+        var repo = Path.Combine(Path.GetTempPath(), "gxc-ui-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(repo);
+        Git(repo, "init -q -b main"); Git(repo, "config user.name Ada"); Git(repo, "config user.email a@x");
+        File.WriteAllText(Path.Combine(repo, "f.txt"), "base\n"); Git(repo, "add ."); Git(repo, "commit -qm base");
+        return repo;
+    }
+
+    [AvaloniaFact]
+    public async Task Squash_merge_leaves_changes_staged_and_opens_commit_tab()
+    {
+        var repo = NewRepo();
+        Git(repo, "checkout -qb topic"); File.WriteAllText(Path.Combine(repo, "t.txt"), "t"); Git(repo, "add ."); Git(repo, "commit -qm topic");
+        Git(repo, "checkout -q main");
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        await vm.OpenAsync(repo);
+
+        await vm.MergeWithAsync(vm.Sidebar.First(e => e.Ref?.Name == "topic").Ref!, Core.Git.MergeMode.Squash);
+        Assert.Equal(1, vm.SelectedTab);
+        Assert.Contains(vm.Staged, f => f.Path == "t.txt");
+        Assert.Contains("squash", vm.StatusText, StringComparison.OrdinalIgnoreCase);
+        Assert.False(vm.HasOperation);
+    }
+
+    [AvaloniaFact]
+    public async Task Rebase_conflict_shows_rebase_banner_then_continues()
+    {
+        var repo = NewRepo();
+        Git(repo, "checkout -qb topic"); File.WriteAllText(Path.Combine(repo, "f.txt"), "topic\n"); Git(repo, "commit -qam topic");
+        Git(repo, "checkout -q main"); File.WriteAllText(Path.Combine(repo, "f.txt"), "main\n"); Git(repo, "commit -qam main");
+        Git(repo, "checkout -q topic");
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        await vm.OpenAsync(repo);
+
+        await vm.RebaseOntoAsync(vm.Sidebar.First(e => e.Ref?.Name == "main").Ref!);
+        Assert.Equal(Core.Models.GitOperation.Rebase, vm.Operation);
+        Assert.Contains("Rebase", vm.OperationText);
+        Assert.Equal(1, vm.ConflictCount);
+
+        await vm.ResolveAsync(vm.Unstaged.Single(), ours: false);
+        await vm.ContinueOperationCommand.ExecuteAsync(null);
+        Assert.False(vm.HasOperation);
+        Assert.Equal("topic", vm.Items.First(i => !i.IsWorkingDir).Subject);
+    }
+
     private static void Git(string dir, string args)
     {
         var psi = new ProcessStartInfo("git", args) { WorkingDirectory = dir, RedirectStandardError = true, RedirectStandardOutput = true };

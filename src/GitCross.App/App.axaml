@@ -54,6 +54,8 @@
       <Setter Property="Padding" Value="10,6" />
       <Setter Property="CornerRadius" Value="6" />
     </Style>
+    <Style Selector="SplitButton.tool /template/ Button"><Setter Property="Background" Value="Transparent" /></Style>
+    <Style Selector="SplitButton.tool /template/ Button:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource HoverBrush}" /></Style>
     <Style Selector="Button.tool:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource HoverBrush}" /></Style>
     <Style Selector="Button.accent"><Setter Property="Background" Value="{DynamicResource AccentBrush}" /><Setter Property="Foreground" Value="White" /></Style>
     <Style Selector="Button.accent /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource AccentBrush}" /><Setter Property="Foreground" Value="White" /></Style>

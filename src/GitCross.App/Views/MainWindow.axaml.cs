@@ -93,7 +93,29 @@ public partial class MainWindow : Window
 
     private void OnSidebarCheckout(object? sender, RoutedEventArgs e) => _vm.CheckoutRefCommand.Execute(RefOf(sender));
 
-    private void OnSidebarMerge(object? sender, RoutedEventArgs e) => _vm.MergeRefCommand.Execute(RefOf(sender));
+    private async void OnSidebarMerge(object? sender, RoutedEventArgs e)
+    {
+        if (RefOf(sender) is { } r) { await _vm.MergeWithAsync(r, MergeMode.Default); }
+    }
+
+    private async void OnSidebarMergeNoFf(object? sender, RoutedEventArgs e)
+    {
+        if (RefOf(sender) is { } r) { await _vm.MergeWithAsync(r, MergeMode.NoFastForward); }
+    }
+
+    private async void OnSidebarMergeSquash(object? sender, RoutedEventArgs e)
+    {
+        if (RefOf(sender) is { } r) { await _vm.MergeWithAsync(r, MergeMode.Squash); }
+    }
+
+    private async void OnSidebarRebase(object? sender, RoutedEventArgs e)
+    {
+        if (RefOf(sender) is { } r
+            && await PromptWindow.AskAsync(this, "Rebase", $"Rebase '{_vm.CurrentBranch}' onto '{r.Name}'? This rewrites the commits of the current branch.", "Rebase") is not null)
+        {
+            await _vm.RebaseOntoAsync(r);
+        }
+    }
 
     private void OnSidebarDelete(object? sender, RoutedEventArgs e) => _vm.DeleteBranchCommand.Execute(RefOf(sender));
 

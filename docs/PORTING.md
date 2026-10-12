@@ -16,8 +16,8 @@
 | Settings dialog | Todo | |
 | Clone / init | Done | clone dialog, init via folder picker |
 | Cherry-pick / revert / reset / tag (commit context menu) | Done | hard reset asks for confirmation |
-| Merge (from sidebar) | Done | no merge dialog/options |
-| Rebase | Todo | |
+| Merge (default, no-ff, squash) | Done | sidebar context menu |
+| Rebase onto branch, pull --rebase | Done | interactive rebase still Todo |
 | Conflict resolution | Done | banner, marker view, accept ours/theirs, continue/abort for merge, cherry-pick, revert, rebase; no 3-way merge editor yet |
 | Blame / file history | Done | right-click a file: blame (at commit or work tree), file history with renames; double-click blame line jumps to commit |
 | Submodules | Todo | |

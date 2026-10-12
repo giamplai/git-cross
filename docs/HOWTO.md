@@ -92,7 +92,7 @@ Drag the thin separators between areas to resize them. The window refreshes itse
 | **Branch pill** | Shows the current branch (or "detached HEAD") and, when the branch tracks a remote, `↑ahead ↓behind` commit counts. |
 | **Refresh** (**F5**) | Reload history, refs and working tree. |
 | **Fetch** | `git fetch --all --prune`. |
-| **Pull** | `git pull` (merge). |
+| **Pull** | `git pull` (merge). Click the **▾** arrow next to it for **Pull (merge)** or **Pull (rebase)**, which replays your local commits on top of the fetched ones instead of creating a merge commit. |
 | **Push** | `git push`. |
 | **Stash** | Stash all changes including untracked files. Does nothing when the working tree is clean. |
 | **Pop** | Apply and remove the newest stash. |
@@ -117,7 +117,7 @@ Interactions:
 * **Single click** – selects the ref and scrolls/selects the matching commit in History. Nothing is changed in your repository by a single click.
 * **Double-click** a branch or tag – checks it out. Double-clicking a remote branch such as `origin/feature` creates a local tracking branch `feature` (git's standard behavior).
 * **Right-click** – context menu:
-  * Branches/remotes/tags: **Checkout**, **Merge into current branch**, **Delete branch** (uses the safe `git branch -d`; unmerged or current branches are refused with a message).
+  * Branches/remotes/tags: **Checkout**, the merge and rebase entries described in [section 10](#10-branches-and-tags), and **Delete branch** (uses the safe `git branch -d`; unmerged or current branches are refused with a message).
   * Stashes: **Apply stash (keep)**, **Pop stash (apply and drop)**, **Drop stash** (asks for confirmation).
 
 ## 6. History and the commit graph
@@ -223,7 +223,10 @@ If there is nothing staged or the message is empty, the status bar says so and n
 |---|---|
 | Create a branch at a commit and switch to it | Select the commit → type a name → **Branch here**. |
 | Switch branch | Double-click it in the sidebar, or right-click → **Checkout**. |
-| Merge a branch into the current one | Right-click the branch → **Merge into current branch**. If it conflicts, see [section 15](#15-resolving-conflicts). |
+| Merge a branch into the current one | Right-click the branch → **Merge into current branch**. Git fast-forwards when it can, otherwise creates a merge commit. If it conflicts, see [section 15](#15-resolving-conflicts). |
+| Always record a merge commit | **Merge (always create merge commit)** — `--no-ff`; keeps the branch visible in the graph even when a fast-forward was possible. |
+| Combine a branch into one commit | **Merge (squash into staged changes)** — brings the branch's changes into your index without committing and opens the **Commit** tab; write a message and commit. No merge relationship is recorded. |
+| Put your branch on top of another | **Rebase current branch onto this** — replays the *current* branch's commits after the selected branch, giving a linear history. Asks for confirmation because it rewrites the current branch's commits (avoid on branches you already pushed and others use). Conflicts show the banner of section 15; **Continue** moves to the next commit. |
 | Delete a branch | Right-click → **Delete branch** (safe delete only; the current branch cannot be deleted). |
 | Create a tag | Right-click a commit → **Create tag here…**. |
 | Check out a tag | Double-click it (detached HEAD). |
@@ -233,7 +236,7 @@ If a checkout would overwrite uncommitted changes, git refuses and the message a
 ## 11. Fetch, pull and push
 
 * **Fetch** downloads new commits and prunes deleted remote branches without changing your files.
-* **Pull** fetches and merges the upstream into the current branch.
+* **Pull** fetches and merges the upstream into the current branch. Use the **▾** menu → **Pull (rebase)** to rebase your local commits onto the upstream instead.
 * **Push** uploads the current branch.
 
 The branch pill's `↑N ↓M` shows how many commits you are ahead/behind the upstream. Operations never prompt for passwords in the terminal; configure SSH keys or a git credential helper. If a pull conflicts, the conflict banner appears (section 15). Errors from git (rejected push, no upstream, authentication) are shown in the status bar.
@@ -289,7 +292,7 @@ When a merge, pull, cherry-pick, revert or rebase stops because of conflicting c
 
 1. A yellow banner appears: **"Merge in progress — 1 conflicted file to resolve"**, with **Continue** and **Abort**. The status bar explains the next step.
 2. The **Commit** tab opens. Conflicted files have a pink **!** badge in *Unstaged changes*.
-3. Select a conflicted file: the lower panel shows the file with its conflict markers. **Red = ours** (your current branch), **green = theirs** (the incoming change); blue lines are the `<<<<<<<`, `=======`, `>>>>>>>` markers.
+3. Select a conflicted file: the lower panel shows the file with its conflict markers. **Red = ours** (your current branch), **green = theirs** (the incoming change). *During a rebase git swaps the two: "ours" is the branch you are rebasing onto and "theirs" is your own commit being replayed.*; blue lines are the `<<<<<<<`, `=======`, `>>>>>>>` markers.
 4. Resolve each file, either:
    * right-click → **Accept ours (current branch)** or **Accept theirs (incoming)** – takes that whole version and stages it; or
    * right-click → **Open in default editor**, edit the file to the result you want (remove the markers), save, then click **＋** to mark it resolved.
@@ -337,6 +340,7 @@ The app asks before anything that can lose work:
 * Hard reset
 * Dropping a stash
 * Aborting a merge/cherry-pick/revert/rebase
+* Starting a rebase
 
 Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete unmerged branches. Untracked files are never deleted by a single click.
 
@@ -353,7 +357,7 @@ Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete u
 
 ## 21. Known limitations
 
-* No rebase starter, merge options (no-fast-forward/squash) or interactive rebase yet — an in-progress rebase started elsewhere *is* recognized and can be continued or aborted.
+* Interactive rebase (reordering/squashing/editing commits in a todo list) is not available; plain rebase onto a branch is. A rebase started elsewhere is recognized and can be continued or aborted.
 * Conflicts are resolved per file (take a side, or edit in your editor); there is no built-in three-way merge editor.
 * Staging works per file and per hunk; line-by-line selection inside a hunk is not available.
 * Diffs are plain (no syntax highlighting or side-by-side view yet).

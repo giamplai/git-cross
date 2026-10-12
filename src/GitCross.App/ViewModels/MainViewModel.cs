@@ -691,6 +691,22 @@ public partial class MainViewModel : ObservableObject
 
     [RelayCommand] private Task FetchAsync() => Mutate(() => _repo!.FetchAsync(), true);
 
+    [RelayCommand] private Task PullRebaseAsync() => Mutate(() => _repo!.PullAsync(rebase: true), true);
+
+    public async Task MergeWithAsync(GitRef r, MergeMode mode)
+    {
+        await Mutate(() => _repo!.MergeAsync(r.Name, mode), r);
+        if (mode == MergeMode.Squash && !IsError && Staged.Count > 0)
+        {
+            SelectedTab = 1;
+            StatusText = $"Squash merge of {r.Name} is staged. Write a commit message and commit.";
+        }
+    }
+
+    public Task RebaseOntoAsync(GitRef r) => Mutate(() => _repo!.RebaseAsync(r.Name), r);
+
+    public string CurrentBranch => BranchText;
+
     [RelayCommand] private Task PullAsync() => Mutate(() => _repo!.PullAsync(), true);
 
     [RelayCommand] private Task PushAsync() => Mutate(() => _repo!.PushAsync(), true);
