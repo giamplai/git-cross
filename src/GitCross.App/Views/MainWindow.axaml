@@ -3,156 +3,270 @@
         xmlns:vm="using:GitCross.App.ViewModels"
         xmlns:c="using:GitCross.App.Controls"
         xmlns:m="using:GitCross.Core.Models"
-        xmlns:g="using:GitCross.Core.Graph"
+        xmlns:d="using:GitCross.Core.Diff"
+        x:Name="Root"
         x:Class="GitCross.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="{Binding Title}" Width="1280" Height="800" MinWidth="800" MinHeight="500">
-  <Window.Styles>
-    <Style Selector="TextBlock.mono">
-      <Setter Property="FontFamily" Value="Cascadia Mono,Consolas,Menlo,DejaVu Sans Mono,monospace" />
-      <Setter Property="FontSize" Value="12" />
-    </Style>
-    <Style Selector="ListBox.diff ListBoxItem"><Setter Property="MinHeight" Value="0" /><Setter Property="Padding" Value="6,0" /></Style>
-  </Window.Styles>
-
+        RequestedThemeVariant="{Binding ThemeVariant}"
+        Title="{Binding RepoName, StringFormat='{}{0} — git-cross', FallbackValue='git-cross'}"
+        Width="1360" Height="840" MinWidth="900" MinHeight="560">
   <DockPanel>
-    <!-- Toolbar -->
-    <Border DockPanel.Dock="Top" Padding="8,6" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
-      <StackPanel Orientation="Horizontal" Spacing="6">
-        <Button Content="📂 Open…" Click="OnOpenClick" HotKey="Ctrl+O" />
-        <ComboBox ItemsSource="{Binding Recent}" PlaceholderText="Recent" Width="220" SelectionChanged="OnRecentChanged" />
-        <Separator Width="1" />
-        <Button Content="⟳ Refresh" Command="{Binding RefreshCommand}" HotKey="F5" IsEnabled="{Binding HasRepo}" />
-        <Button Content="⇩ Fetch" Command="{Binding FetchCommand}" IsEnabled="{Binding HasRepo}" />
-        <Button Content="⤓ Pull" Command="{Binding PullCommand}" IsEnabled="{Binding HasRepo}" />
-        <Button Content="⤒ Push" Command="{Binding PushCommand}" IsEnabled="{Binding HasRepo}" />
-        <Button Content="Stash" Command="{Binding StashCommand}" IsEnabled="{Binding HasRepo}" />
-        <Button Content="Pop" Command="{Binding StashPopCommand}" IsEnabled="{Binding HasRepo}" />
-        <ProgressBar IsIndeterminate="True" Width="80" IsVisible="{Binding IsBusy}" />
-      </StackPanel>
+    <!-- ───────── Toolbar ───────── -->
+    <Border DockPanel.Dock="Top" Padding="10,6" Background="{DynamicResource PanelBrush}" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource LineBrush}">
+      <DockPanel LastChildFill="False">
+        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="2">
+          <Button Classes="tool" Content="📂  Open" Click="OnOpenClick" HotKey="Ctrl+O" />
+          <Button Classes="tool" Content="⬇  Clone" Click="OnCloneClick" />
+          <Button Classes="tool" Content="✚  Init" Click="OnInitClick" />
+          <Rectangle Width="1" Margin="6,4" Fill="{DynamicResource LineBrush}" IsVisible="{Binding HasRepo}" />
+          <Border Classes="chip" Background="{DynamicResource HoverBrush}" Padding="10,4" IsVisible="{Binding HasRepo}" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="⎇" Foreground="{DynamicResource AccentBrush}" FontSize="13" />
+              <TextBlock Text="{Binding BranchText}" Foreground="{DynamicResource MutedBrush}" FontWeight="SemiBold" FontSize="13" />
+              <TextBlock Text="{Binding SyncText}" Foreground="{DynamicResource MutedBrush}" FontSize="12" />
+            </StackPanel>
+          </Border>
+          <Rectangle Width="1" Margin="6,4" Fill="{DynamicResource LineBrush}" IsVisible="{Binding HasRepo}" />
+          <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding HasRepo}">
+            <Button Classes="tool" Content="⟳  Refresh" Command="{Binding RefreshCommand}" HotKey="F5" />
+            <Button Classes="tool" Content="⇩  Fetch" Command="{Binding FetchCommand}" />
+            <Button Classes="tool" Content="⤓  Pull" Command="{Binding PullCommand}" />
+            <Button Classes="tool" Content="⤒  Push" Command="{Binding PushCommand}" />
+            <Button Classes="tool" Content="Stash" Command="{Binding StashCommand}" />
+            <Button Classes="tool" Content="Pop" Command="{Binding StashPopCommand}" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+          <TextBox x:Name="SearchBox" Text="{Binding SearchText}" Watermark="🔍  Search commits  (Ctrl+F)" Width="270" MinHeight="30" IsVisible="{Binding HasRepo}" />
+          <Button Classes="tool" Content="{Binding ThemeLabel}" Command="{Binding CycleThemeCommand}" ToolTip.Tip="Switch theme" />
+        </StackPanel>
+      </DockPanel>
     </Border>
 
-    <!-- Status bar -->
-    <Border DockPanel.Dock="Bottom" Padding="8,3" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
-      <TextBlock Text="{Binding StatusText}" FontSize="12" />
+    <!-- ───────── Status bar ───────── -->
+    <Border DockPanel.Dock="Bottom" Padding="12,4" Background="{DynamicResource PanelBrush}" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource LineBrush}">
+      <DockPanel>
+        <ProgressBar DockPanel.Dock="Right" IsIndeterminate="True" Width="90" Height="4" IsVisible="{Binding IsBusy}" />
+        <TextBlock Text="{Binding StatusText}" FontSize="12" Classes="muted" TextTrimming="CharacterEllipsis" IsVisible="{Binding !IsError}" />
+        <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource ErrorBrush}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" IsVisible="{Binding IsError}" />
+      </DockPanel>
     </Border>
 
-    <Grid ColumnDefinitions="220,4,*">
-      <!-- Sidebar: branches / remotes / tags -->
-      <ScrollViewer Grid.Column="0">
-        <ItemsControl ItemsSource="{Binding RefGroups}" Margin="6">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:RefGroup">
-              <Expander Header="{Binding Title}" IsExpanded="True" HorizontalAlignment="Stretch" Padding="0">
-                <ItemsControl ItemsSource="{Binding Items}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="m:GitRef">
-                      <Button Padding="6,2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Background="Transparent"
-                              Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CheckoutRefCommand}"
-                              CommandParameter="{Binding}" ToolTip.Tip="Double-click not needed: click to checkout">
-                        <TextBlock Text="{Binding Name}" FontWeight="{Binding IsCurrent, Converter={x:Static c:Converters.BoldIf}}" TextTrimming="CharacterEllipsis" />
-                      </Button>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </Expander>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
-      <GridSplitter Grid.Column="1" />
-
-      <Grid Grid.Column="2" RowDefinitions="*,4,*">
-        <TabControl Grid.Row="0">
-          <TabItem Header="History">
-            <Grid ColumnDefinitions="*,4,340">
-              <ListBox Grid.Column="0" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}" Padding="0">
-                <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="g:GraphRow">
-                    <StackPanel Orientation="Horizontal" Height="24">
-                      <c:GraphCell Row="{Binding}" />
-                      <TextBlock Text="{Binding Commit.Subject}" VerticalAlignment="Center" Width="460" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Text="{Binding Commit.AuthorName}" VerticalAlignment="Center" Width="140" Opacity="0.7" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Text="{Binding Commit.AuthorDate, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" VerticalAlignment="Center" Width="120" Opacity="0.7" />
-                      <TextBlock Text="{Binding Commit.ShortSha}" Classes="mono" VerticalAlignment="Center" Opacity="0.6" />
+    <Grid>
+      <!-- ───────── Welcome ───────── -->
+      <ScrollViewer IsVisible="{Binding !HasRepo}" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="560" Margin="24,56,24,24" Spacing="22" HorizontalAlignment="Center">
+          <StackPanel Spacing="4">
+            <TextBlock Text="git-cross" FontSize="34" FontWeight="Bold" />
+            <TextBlock Text="A fast, native Git client for Linux, macOS and Windows." Classes="muted" FontSize="15" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Classes="accent" Content="📂  Open repository" Padding="16,10" Click="OnOpenClick" />
+            <Button Content="⬇  Clone" Padding="16,10" Click="OnCloneClick" />
+            <Button Content="✚  Init new" Padding="16,10" Click="OnInitClick" />
+          </StackPanel>
+          <StackPanel Spacing="8" IsVisible="{Binding Recent.Count}">
+            <TextBlock Text="RECENT" Classes="section" />
+            <ItemsControl ItemsSource="{Binding Recent}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:RecentRepo">
+                  <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,0,0,6" Padding="14,10"
+                          Command="{Binding #Root.((vm:MainViewModel)DataContext).OpenRecentCommand}" CommandParameter="{Binding Path}">
+                    <StackPanel>
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding Path}" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
-                  </DataTemplate>
-                </ListBox.ItemTemplate>
-              </ListBox>
-              <GridSplitter Grid.Column="1" />
-              <DockPanel Grid.Column="2">
-                <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="6">
-                  <StackPanel Orientation="Horizontal" Spacing="4">
-                    <TextBox Text="{Binding NewBranchName}" Watermark="new branch name" Width="160" />
-                    <Button Content="Branch here" Command="{Binding CreateBranchCommand}" />
-                    <Button Content="Checkout" Command="{Binding CheckoutCommitCommand}" />
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- ───────── Repository view ───────── -->
+      <Grid IsVisible="{Binding HasRepo}" ColumnDefinitions="240,6,*" Margin="8">
+        <!-- Sidebar -->
+        <Border Classes="panel" Padding="0,6">
+          <ListBox ItemsSource="{Binding Sidebar}" SelectedItem="{Binding SelectedSidebar}" Classes="tight" DoubleTapped="OnSidebarDoubleTapped">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:SidebarEntry">
+                <Grid>
+                  <DockPanel IsVisible="{Binding IsHeader}" Margin="0,10,0,2">
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding Count}" Classes="section" />
+                    <TextBlock Text="{Binding Text}" Classes="section" />
+                  </DockPanel>
+                  <StackPanel IsVisible="{Binding IsItem}" Orientation="Horizontal" Spacing="8" Background="Transparent">
+                    <StackPanel.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Checkout" Click="OnSidebarCheckout" />
+                        <MenuItem Header="Merge into current branch" Click="OnSidebarMerge" />
+                        <MenuItem Header="Delete branch" Click="OnSidebarDelete" />
+                      </ContextMenu>
+                    </StackPanel.ContextMenu>
+                    <TextBlock Text="{Binding ., Converter={x:Static c:Converters.SidebarGlyph}}" Width="14" Classes="muted" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                               FontWeight="{Binding Ref.IsCurrent, FallbackValue=Normal, Converter={x:Static c:Converters.BoldIf}}" />
                   </StackPanel>
-                  <TextBox Text="{Binding CommitBody}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="170" FontSize="12" />
-                </StackPanel>
-                <ListBox ItemsSource="{Binding CommitFiles}" SelectedItem="{Binding SelectedCommitFile}">
-                  <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="m:FileChange">
-                      <TextBlock Text="{Binding Path}" Classes="mono" TextTrimming="CharacterEllipsis" />
-                    </DataTemplate>
-                  </ListBox.ItemTemplate>
-                </ListBox>
-              </DockPanel>
-            </Grid>
-          </TabItem>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+        <GridSplitter Grid.Column="1" Background="Transparent" />
 
-          <TabItem Header="Commit">
-            <Grid ColumnDefinitions="*,*,*" Margin="4">
-              <DockPanel Grid.Column="0" Margin="2">
-                <DockPanel DockPanel.Dock="Top"><Button DockPanel.Dock="Right" Content="Stage all" Command="{Binding StageAllCommand}" /><TextBlock Text="Unstaged" FontWeight="SemiBold" VerticalAlignment="Center" /></DockPanel>
-                <ListBox ItemsSource="{Binding Unstaged}" SelectedItem="{Binding SelectedUnstaged}">
-                  <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="m:FileChange">
-                      <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="+" Padding="6,0" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).StageCommand}" CommandParameter="{Binding}" />
-                        <TextBlock Text="{Binding Kind}" Width="76" Opacity="0.6" FontSize="11" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding Path}" Classes="mono" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                      </DockPanel>
-                    </DataTemplate>
-                  </ListBox.ItemTemplate>
-                </ListBox>
-              </DockPanel>
-              <DockPanel Grid.Column="1" Margin="2">
-                <DockPanel DockPanel.Dock="Top"><Button DockPanel.Dock="Right" Content="Unstage all" Command="{Binding UnstageAllCommand}" /><TextBlock Text="Staged" FontWeight="SemiBold" VerticalAlignment="Center" /></DockPanel>
-                <ListBox ItemsSource="{Binding Staged}" SelectedItem="{Binding SelectedStaged}">
-                  <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="m:FileChange">
-                      <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="−" Padding="6,0" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).UnstageCommand}" CommandParameter="{Binding}" />
-                        <TextBlock Text="{Binding Kind}" Width="76" Opacity="0.6" FontSize="11" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding Path}" Classes="mono" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                      </DockPanel>
-                    </DataTemplate>
-                  </ListBox.ItemTemplate>
-                </ListBox>
-              </DockPanel>
-              <DockPanel Grid.Column="2" Margin="2">
-                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
-                  <Button Content="Commit" Command="{Binding CommitCommand}" Classes="accent" />
-                  <CheckBox Content="Amend" IsChecked="{Binding Amend}" />
-                </StackPanel>
-                <TextBlock DockPanel.Dock="Top" Text="Message" FontWeight="SemiBold" />
-                <TextBox Text="{Binding CommitMessage}" AcceptsReturn="True" TextWrapping="Wrap" />
-              </DockPanel>
-            </Grid>
-          </TabItem>
-        </TabControl>
+        <Grid Grid.Column="2" RowDefinitions="*,6,*">
+          <Border Classes="panel" ClipToBounds="True">
+            <TabControl SelectedIndex="{Binding SelectedTab}">
+              <!-- History -->
+              <TabItem Header="History">
+                <Grid ColumnDefinitions="*,6,360">
+                  <DockPanel>
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,150,96,64" Height="26" Background="{DynamicResource PanelAltBrush}">
+                      <Border Width="{Binding GraphWidth}" />
+                      <TextBlock Grid.Column="1" Text="MESSAGE" Classes="section" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Text="AUTHOR" Classes="section" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="3" Text="DATE" Classes="section" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="4" Text="ID" Classes="section" VerticalAlignment="Center" />
+                    </Grid>
+                    <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" Classes="history">
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:HistoryItem">
+                          <Grid ColumnDefinitions="Auto,*,150,96,64" Height="28" ToolTip.Tip="{Binding FullDate}">
+                            <c:GraphCell Row="{Binding Row}" Width="{Binding GraphWidth}" IsVisible="{Binding !IsWorkingDir}" />
+                            <TextBlock Text="●" IsVisible="{Binding IsWorkingDir}" Width="{Binding GraphWidth}" TextAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" ClipToBounds="True">
+                              <ItemsControl ItemsSource="{Binding Labels}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="vm:RefLabel">
+                                    <Border Classes="chip" Background="{Binding ., Converter={x:Static c:Converters.ChipBackground}}">
+                                      <TextBlock><Run Text="{Binding ., Converter={x:Static c:Converters.ChipGlyph}}" /><Run Text="{Binding Text}" /></TextBlock>
+                                    </Border>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                              <TextBlock Text="{Binding Subject}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" IsVisible="{Binding !IsWorkingDir}">
+                              <Border Classes="avatar" Background="{Binding Author, Converter={x:Static c:Converters.AvatarBrush}}" VerticalAlignment="Center"><TextBlock Text="{Binding Initials}" /></Border>
+                              <TextBlock Text="{Binding Author}" VerticalAlignment="Center" Classes="muted" TextTrimming="CharacterEllipsis" MaxWidth="118" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="3" Text="{Binding When}" VerticalAlignment="Center" Classes="muted" />
+                            <TextBlock Grid.Column="4" Text="{Binding ShortSha}" VerticalAlignment="Center" Classes="mono muted" />
+                          </Grid>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </DockPanel>
+                  <GridSplitter Grid.Column="1" />
+                  <Grid Grid.Column="2" RowDefinitions="Auto,Auto,*" Margin="10">
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,8">
+                      <TextBox Text="{Binding NewBranchName}" Watermark="new branch name" Width="150" MinHeight="28" />
+                      <Button Classes="mini" Content="Branch here" Command="{Binding CreateBranchCommand}" />
+                      <Button Classes="mini" Content="Checkout" Command="{Binding CheckoutCommitCommand}" />
+                    </StackPanel>
+                    <Border Grid.Row="1" Background="{DynamicResource PanelAltBrush}" CornerRadius="6" Padding="10" MaxHeight="190" Margin="0,0,0,8">
+                      <ScrollViewer><SelectableTextBlock Text="{Binding CommitInfo}" TextWrapping="Wrap" FontSize="12.5" /></ScrollViewer>
+                    </Border>
+                    <ListBox Grid.Row="2" ItemsSource="{Binding CommitFiles}" SelectedItem="{Binding SelectedCommitFile}" Classes="tight">
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="m:FileChange">
+                          <StackPanel Orientation="Horizontal">
+                            <Border Classes="kind" Background="{Binding Kind, Converter={x:Static c:Converters.ChangeBrush}}"><TextBlock Text="{Binding Kind, Converter={x:Static c:Converters.ChangeLetter}}" /></Border>
+                            <TextBlock Text="{Binding Path}" Classes="mono" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </Grid>
+                </Grid>
+              </TabItem>
 
-        <GridSplitter Grid.Row="1" />
+              <!-- Commit -->
+              <TabItem Header="Commit">
+                <Grid ColumnDefinitions="*,*,1.1*" Margin="10" ColumnSpacing="10">
+                  <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                      <Button DockPanel.Dock="Right" Classes="mini" Content="Stage all ⤳" Command="{Binding StageAllCommand}" />
+                      <TextBlock Text="{Binding UnstagedHeader}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <ListBox ItemsSource="{Binding Unstaged}" SelectedItem="{Binding SelectedUnstaged}" Classes="tight">
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="m:FileChange">
+                          <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                              <Button Classes="mini" Content="↶" ToolTip.Tip="Discard changes" Command="{Binding #Root.((vm:MainViewModel)DataContext).DiscardCommand}" CommandParameter="{Binding}" />
+                              <Button Classes="mini" Content="＋" ToolTip.Tip="Stage" Command="{Binding #Root.((vm:MainViewModel)DataContext).StageCommand}" CommandParameter="{Binding}" />
+                            </StackPanel>
+                            <Border Classes="kind" Background="{Binding Kind, Converter={x:Static c:Converters.ChangeBrush}}"><TextBlock Text="{Binding Kind, Converter={x:Static c:Converters.ChangeLetter}}" /></Border>
+                            <TextBlock Text="{Binding Path}" Classes="mono" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          </DockPanel>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </DockPanel>
+                  <DockPanel Grid.Column="1">
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                      <Button DockPanel.Dock="Right" Classes="mini" Content="⤺ Unstage all" Command="{Binding UnstageAllCommand}" />
+                      <TextBlock Text="{Binding StagedHeader}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <ListBox ItemsSource="{Binding Staged}" SelectedItem="{Binding SelectedStaged}" Classes="tight">
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="m:FileChange">
+                          <DockPanel>
+                            <Button DockPanel.Dock="Right" Classes="mini" Content="－" ToolTip.Tip="Unstage" Command="{Binding #Root.((vm:MainViewModel)DataContext).UnstageCommand}" CommandParameter="{Binding}" />
+                            <Border Classes="kind" Background="{Binding Kind, Converter={x:Static c:Converters.ChangeBrush}}"><TextBlock Text="{Binding Kind, Converter={x:Static c:Converters.ChangeLetter}}" /></Border>
+                            <TextBlock Text="{Binding Path}" Classes="mono" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          </DockPanel>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </DockPanel>
+                  <DockPanel Grid.Column="2">
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
+                      <Button Classes="accent" Content="Commit  (Ctrl+Enter)" Padding="14,7" Command="{Binding CommitCommand}" />
+                      <CheckBox Content="Amend last commit" IsChecked="{Binding Amend}" />
+                      <TextBlock Text="{Binding SummaryLength, StringFormat='{}{0}/72'}" Classes="muted" VerticalAlignment="Center" FontSize="12" />
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Commit message" FontWeight="SemiBold" Margin="0,0,0,6" />
+                    <TextBox Text="{Binding CommitMessage}" AcceptsReturn="True" TextWrapping="Wrap" Watermark="Summary on the first line, details below…">
+                      <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Ctrl+Enter" Command="{Binding CommitCommand}" />
+                      </TextBox.KeyBindings>
+                    </TextBox>
+                  </DockPanel>
+                </Grid>
+              </TabItem>
+            </TabControl>
+          </Border>
 
-        <ListBox Grid.Row="2" Classes="diff" ItemsSource="{Binding Diff}" SelectionMode="Multiple">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:DiffLine">
-              <Border Background="{Binding Kind, Converter={x:Static c:Converters.DiffBackground}}" Padding="6,0">
-                <TextBlock Text="{Binding Text}" Classes="mono" Opacity="{Binding Kind, Converter={x:Static c:Converters.DiffOpacity}}" />
+          <GridSplitter Grid.Row="1" Background="Transparent" />
+
+          <!-- Diff -->
+          <Border Grid.Row="2" Classes="panel" ClipToBounds="True">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Padding="12,6" Background="{DynamicResource PanelAltBrush}" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource LineBrush}">
+                <TextBlock Text="{Binding DiffTitle, FallbackValue=Changes}" Classes="mono" FontWeight="SemiBold" />
               </Border>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
+              <Grid>
+                <ListBox Classes="diff" ItemsSource="{Binding Diff}" SelectionMode="Multiple" ScrollViewer.HorizontalScrollBarVisibility="Auto" IsVisible="{Binding HasDiff}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="d:DiffLine">
+                      <Grid ColumnDefinitions="48,48,18,*" Background="{Binding Kind, Converter={x:Static c:Converters.DiffBackground}}" Opacity="{Binding Kind, Converter={x:Static c:Converters.DiffOpacity}}">
+                        <TextBlock Text="{Binding OldNumber, Converter={x:Static c:Converters.LineNumber}}" Classes="mono muted" TextAlignment="Right" Margin="0,0,8,0" />
+                        <TextBlock Grid.Column="1" Text="{Binding NewNumber, Converter={x:Static c:Converters.LineNumber}}" Classes="mono muted" TextAlignment="Right" Margin="0,0,8,0" />
+                        <TextBlock Grid.Column="2" Text="{Binding Kind, Converter={x:Static c:Converters.DiffSign}}" Classes="mono" />
+                        <TextBlock Grid.Column="3" Text="{Binding Text}" Classes="mono" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock Text="Select a file to see its changes" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasDiff}" />
+              </Grid>
+            </DockPanel>
+          </Border>
+        </Grid>
       </Grid>
     </Grid>
   </DockPanel>

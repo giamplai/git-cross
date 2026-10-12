@@ -20,7 +20,11 @@ public sealed class GraphCell : Control
     public static readonly StyledProperty<GraphRow?> RowProperty =
         AvaloniaProperty.Register<GraphCell, GraphRow?>(nameof(Row));
 
-    static GraphCell() => AffectsRender<GraphCell>(RowProperty);
+    static GraphCell()
+    {
+        AffectsRender<GraphCell>(RowProperty);
+        ClipToBoundsProperty.OverrideDefaultValue<GraphCell>(true);
+    }
 
     public GraphRow? Row
     {
@@ -29,7 +33,7 @@ public sealed class GraphCell : Control
     }
 
     protected override Size MeasureOverride(Size availableSize)
-        => new((Row?.LaneCount ?? 1) * LaneWidth + 4, RowHeight);
+        => new(double.IsInfinity(availableSize.Width) ? 0 : availableSize.Width, RowHeight);
 
     public override void Render(DrawingContext ctx)
     {
@@ -67,7 +71,7 @@ public sealed class GraphCell : Control
                 new Point(X(row.Lane), 0), new Point(X(row.Lane), mid));
         }
 
-        ctx.DrawEllipse(Palette[row.ColorIndex % Palette.Length], new Pen(Brushes.White, 1.5),
+        ctx.DrawEllipse(Palette[row.ColorIndex % Palette.Length], new Pen(new SolidColorBrush(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)), 1.5),
             new Point(X(row.Lane), mid), 5, 5);
     }
 }
