@@ -5,9 +5,14 @@ namespace GitCross.Core.Diff;
 
 public enum DiffLineKind { Meta, Hunk, Added, Removed, Context }
 
+/// <param name="ChangeStart">Start of the edited characters inside <c>Text</c> (changed lines paired with their counterpart only).</param>
+/// <param name="ChangeLength">Number of edited characters; 0 = highlight nothing extra.</param>
 /// <param name="HunkIndex">Zero-based hunk this line belongs to (hunk header included); -1 for file header lines.</param>
-public sealed record DiffLine(DiffLineKind Kind, string Text, int? OldNumber, int? NewNumber, int HunkIndex = -1)
+public sealed record DiffLine(DiffLineKind Kind, string Text, int? OldNumber, int? NewNumber, int HunkIndex = -1, int ChangeStart = 0, int ChangeLength = 0)
 {
+    /// <summary>True when part of the line (not all of it) was edited, as found by intra-line comparison.</summary>
+    public bool HasInlineChange => ChangeLength > 0;
+
     public bool IsHunk => Kind == DiffLineKind.Hunk;
 }
 
@@ -62,6 +67,6 @@ public static partial class DiffParser
             }
         }
 
-        return result;
+        return IntraLine.Annotate(result);
     }
 }
