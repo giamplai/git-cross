@@ -35,6 +35,7 @@ public partial class MainViewModel : ObservableObject
     {
         _store = store ?? new SettingsStore(SettingsStore.DefaultPath);
         _settings = _store.Load();
+        GitRunner.Executable = string.IsNullOrWhiteSpace(_settings.GitExecutable) ? "git" : _settings.GitExecutable;
         foreach (var p in _settings.RecentRepositories)
         {
             Recent.Add(new RecentRepo(Path.GetFileName(p.TrimEnd('/', '\\')), p));
@@ -122,6 +123,16 @@ public partial class MainViewModel : ObservableObject
         "Dark" => ThemeVariant.Dark,
         _ => ThemeVariant.Default,
     };
+
+    public AppSettings Settings => _settings;
+
+    /// <summary>Persist settings edited by the Settings dialog and apply them immediately.</summary>
+    public async Task ApplySettingsAsync()
+    {
+        GitRunner.Executable = string.IsNullOrWhiteSpace(_settings.GitExecutable) ? "git" : _settings.GitExecutable;
+        SaveSettings();
+        await RefreshAsync(); // history size may have changed
+    }
 
     public string? InitialRepoPath => Recent.FirstOrDefault()?.Path;
 
@@ -282,7 +293,7 @@ public partial class MainViewModel : ObservableObject
         var keep = SelectedItem?.Commit?.Sha;
         await Guard(async () =>
         {
-            var commitsTask = _fileFilter is { } ff ? repo.GetFileLogAsync(ff) : repo.GetLogAsync();
+            var commitsTask = _fileFilter is { } ff ? repo.GetFileLogAsync(ff, _settings.MaxCommits) : repo.GetLogAsync(_settings.MaxCommits);
             var refsTask = repo.GetRefsAsync();
             var statusTask = repo.GetStatusAsync();
             var stashTask = repo.GetStashesAsync();
@@ -707,7 +718,9 @@ public partial class MainViewModel : ObservableObject
 
     public string CurrentBranch => BranchText;
 
-    [RelayCommand] private Task PullAsync() => Mutate(() => _repo!.PullAsync(), true);
+    [RelayCommand] private Task PullAsync() => Mutate(() => _repo!.PullAsync(rebase: _settings.PullRebase), true);
+
+    [RelayCommand] private Task PullMergeAsync() => Mutate(() => _repo!.PullAsync(rebase: false), true);
 
     [RelayCommand] private Task PushAsync() => Mutate(() => _repo!.PushAsync(), true);
 

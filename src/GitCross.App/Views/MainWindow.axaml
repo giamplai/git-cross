@@ -33,7 +33,7 @@
             <SplitButton Classes="tool" Content="⤓  Pull" Command="{Binding PullCommand}">
               <SplitButton.Flyout>
                 <MenuFlyout>
-                  <MenuItem Header="Pull (merge)" Command="{Binding PullCommand}" />
+                  <MenuItem Header="Pull (merge)" Command="{Binding PullMergeCommand}" />
                   <MenuItem Header="Pull (rebase)" Command="{Binding PullRebaseCommand}" />
                 </MenuFlyout>
               </SplitButton.Flyout>
@@ -45,6 +45,7 @@
         </StackPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
           <TextBox x:Name="SearchBox" Text="{Binding SearchText}" PlaceholderText="🔍  Search commits  (Ctrl+F)" Width="270" MinHeight="30" IsVisible="{Binding HasRepo}" />
+          <Button Classes="tool" Content="⚙" ToolTip.Tip="Settings" Click="OnSettingsClick" />
           <Button Classes="tool" Content="{Binding ThemeLabel}" Command="{Binding CycleThemeCommand}" ToolTip.Tip="Switch theme" />
         </StackPanel>
       </DockPanel>

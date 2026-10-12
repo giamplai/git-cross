@@ -69,6 +69,14 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnSettingsClick(object? sender, RoutedEventArgs e)
+    {
+        if (await new SettingsWindow(_vm.Settings).ShowDialog<bool>(this))
+        {
+            await _vm.ApplySettingsAsync();
+        }
+    }
+
     private async void OnCloneClick(object? sender, RoutedEventArgs e)
     {
         var dialog = new CloneWindow(_vm.LastCloneDirectory);

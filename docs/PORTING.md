@@ -13,7 +13,7 @@
 | Stash push/pop/apply/drop + list | Done | sidebar section, context menu; untracked files in a stash are not shown |
 | Hunk staging (stage/unstage/discard hunk) | Done | line-level selection still Todo |
 | Themes (system/light/dark) | Done | persisted |
-| Settings dialog | Todo | |
+| Settings dialog | Done | git path, identity, pull mode, history size |
 | Clone / init | Done | clone dialog, init via folder picker |
 | Cherry-pick / revert / reset / tag (commit context menu) | Done | hard reset asks for confirmation |
 | Merge (default, no-ff, squash) | Done | sidebar context menu |

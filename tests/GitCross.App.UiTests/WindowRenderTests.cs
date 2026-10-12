@@ -302,6 +302,32 @@ public class WindowRenderTests
     }
 
     [AvaloniaFact]
+    public async Task Settings_dialog_shows_fake_identity_and_saves_values()
+    {
+        // Screenshots are committed to the repo: never let them read the developer's real ~/.gitconfig.
+        var cfg = Path.Combine(Path.GetTempPath(), "gxc-fakecfg-" + Guid.NewGuid().ToString("N")[..8]);
+        File.WriteAllText(cfg, "[user]\n\tname = Ada Lovelace\n\temail = ada@example.com\n");
+        var old = Environment.GetEnvironmentVariable("GIT_CONFIG_GLOBAL");
+        Environment.SetEnvironmentVariable("GIT_CONFIG_GLOBAL", cfg);
+        try
+        {
+            var settings = new SettingsStore(Path.Combine(Path.GetTempPath(), "gxc-nos-" + Guid.NewGuid() + ".json")).Load();
+            var dlg = new SettingsWindow(settings);
+            dlg.Show();
+            await Settle();
+            Assert.Equal("Ada Lovelace", dlg.FindControl<TextBox>("NameBox")!.Text);
+            Assert.StartsWith("✓ git version", dlg.FindControl<TextBlock>("GitStatusText")!.Text);
+            Shot(dlg, "settings-dialog.png");
+            dlg.Close();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GIT_CONFIG_GLOBAL", old);
+            File.Delete(cfg);
+        }
+    }
+
+    [AvaloniaFact]
     public async Task Dialogs_render()
     {
         var clone = new CloneWindow("/path/to/projects");

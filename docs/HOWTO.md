@@ -23,7 +23,7 @@ All screenshots are generated from the real application by `scripts/update-docs.
 14. [Blame and file history](#14-blame-and-file-history)
 15. [Resolving conflicts](#15-resolving-conflicts)
 16. [Themes](#16-themes)
-17. [Settings and where data is stored](#17-settings-and-where-data-is-stored)
+17. [Settings dialog and stored data](#17-settings-dialog-and-stored-data)
 18. [Keyboard shortcuts](#18-keyboard-shortcuts)
 19. [Safety: what asks for confirmation](#19-safety-what-asks-for-confirmation)
 20. [Troubleshooting](#20-troubleshooting)
@@ -92,11 +92,12 @@ Drag the thin separators between areas to resize them. The window refreshes itse
 | **Branch pill** | Shows the current branch (or "detached HEAD") and, when the branch tracks a remote, `↑ahead ↓behind` commit counts. |
 | **Refresh** (**F5**) | Reload history, refs and working tree. |
 | **Fetch** | `git fetch --all --prune`. |
-| **Pull** | `git pull` (merge). Click the **▾** arrow next to it for **Pull (merge)** or **Pull (rebase)**, which replays your local commits on top of the fetched ones instead of creating a merge commit. |
+| **Pull** | `git pull` using your default mode (merge, or rebase if you enabled it in Settings). Click the **▾** arrow next to it for **Pull (merge)** or **Pull (rebase)** to choose explicitly; rebase replays your local commits on top of the fetched ones instead of creating a merge commit. |
 | **Push** | `git push`. |
 | **Stash** | Stash all changes including untracked files. Does nothing when the working tree is clean. |
 | **Pop** | Apply and remove the newest stash. |
 | **Search box** (**Ctrl+F**) | Filter the history, see [section 7](#7-searching-commits). |
+| **⚙ Settings** | Opens the settings dialog ([section 17](#17-settings-dialog-and-stored-data)). |
 | **Theme button** | Cycles System → Light → Dark. |
 
 While a git command runs, a progress bar appears at the right of the status bar.
@@ -131,7 +132,7 @@ Each row of the **History** tab is one commit:
 * **Message**, **Author** (with a coloured initials avatar), **Date** (relative: "5 min ago", "3 days ago"; hover for the exact time) and the short **ID**.
 * The first row **Uncommitted changes (N)** appears when your working tree has changes. Selecting it switches to the **Commit** tab.
 
-The list shows the most recent 2000 commits across all branches. Stash internals are deliberately hidden from the graph.
+The list shows the most recent commits across all branches (2000 by default; adjustable in [Settings](#17-settings-dialog-and-stored-data)). Stash internals are deliberately hidden from the graph.
 
 Click a commit to see its details on the right (section 8).
 
@@ -309,9 +310,24 @@ Click the theme button at the right of the toolbar to cycle **System** (follows 
 
 ![Commit tab, dark](images/commit-dark.png)
 
-## 17. Settings and where data is stored
+## 17. Settings dialog and stored data
 
-Settings (recent repositories, theme, last clone folder) are stored in a small JSON file:
+![Settings dialog](images/settings-dialog.png)
+
+Click **⚙** in the toolbar. Changes apply when you press **Save** (**Esc**/Cancel discards them).
+
+| Setting | What it does |
+|---|---|
+| **Git executable** | Leave empty to use `git` from your `PATH`. Set a full path to use a specific installation (for example a newer git, or Git for Windows in a custom folder). **Test** runs `git --version` and shows the result in green (✓) or an error (✗); **Browse…** lets you pick the file. Saving is refused while the path cannot be started. |
+| **Identity — Name / Email** | Your *global* git `user.name` and `user.email` (stored in your `~/.gitconfig`), used as the author of new commits. Clearing a field removes that key. A repository's own local config, if set, still takes precedence. |
+| **Pull with rebase** | Makes the toolbar **Pull** button rebase instead of merge. (The Pull **▾** menu can always choose explicitly.) |
+| **Commits loaded in History** | 500, 1000, 2000 (default), 5000 or 10000. Lower it for a faster view of huge repositories; raise it to see further back. |
+
+The theme is switched with the toolbar button rather than this dialog.
+
+### Where data is stored
+
+Application settings (recent repositories, theme, last clone folder and the options above) live in a small JSON file:
 
 | OS | Location |
 |---|---|
@@ -319,7 +335,7 @@ Settings (recent repositories, theme, last clone folder) are stored in a small J
 | macOS | `~/Library/Application Support/git-cross/settings.json` |
 | Windows | `%APPDATA%\git-cross\settings.json` |
 
-You can delete it at any time to reset the app; a missing or corrupt file is simply ignored. The app never modifies your git configuration.
+You can delete it at any time to reset the app; a missing or corrupt file is simply ignored. The only git configuration the app ever changes is the global `user.name` / `user.email`, and only when you press Save in the Settings dialog.
 
 ## 18. Keyboard shortcuts
 
@@ -354,6 +370,8 @@ Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete u
 | History looks stale | Press **F5**. |
 | Checkout refused | You have uncommitted changes that would be overwritten: stash or commit them. |
 | Settings misbehave | Delete the settings file (section 17). |
+| Wrong or missing author on commits | Set your name and email in **⚙ Settings → Identity**. |
+| "git executable cannot be started" | Clear the path to use `git` from PATH, or install git and use **Browse…** to select it. |
 
 ## 21. Known limitations
 
@@ -361,5 +379,5 @@ Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete u
 * Conflicts are resolved per file (take a side, or edit in your editor); there is no built-in three-way merge editor.
 * Staging works per file and per hunk; line-by-line selection inside a hunk is not available.
 * Diffs are plain (no syntax highlighting or side-by-side view yet).
-* The history view loads the latest 2000 commits.
+* The history view loads a limited number of commits (2000 by default; see Settings).
 * Submodules, plugins, shell integration and localization are not implemented yet (see `docs/PORTING.md`).

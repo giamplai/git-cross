@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="GitCross.App.Views.SettingsWindow"
+        Title="Settings" Width="580" SizeToContent="Height" CanResize="False" WindowStartupLocation="CenterOwner">
+  <StackPanel Margin="24" Spacing="18">
+    <TextBlock Text="Settings" FontSize="22" FontWeight="Bold" />
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="GIT" Classes="section" />
+      <TextBlock Text="Git executable (leave empty to use “git” from your PATH)" Classes="muted" FontSize="12" />
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="Browse…" Margin="8,0,0,0" Click="OnBrowseGit" />
+        <Button DockPanel.Dock="Right" Content="Test" Margin="8,0,0,0" Click="OnTestGit" />
+        <TextBox x:Name="GitPathBox" PlaceholderText="git" />
+      </DockPanel>
+      <TextBlock x:Name="GitStatusText" FontSize="12" />
+    </StackPanel>
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="IDENTITY (global git config)" Classes="section" />
+      <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto" RowSpacing="8">
+        <TextBlock Text="Name" VerticalAlignment="Center" />
+        <TextBox x:Name="NameBox" Grid.Column="1" PlaceholderText="Your Name" />
+        <TextBlock Grid.Row="1" Text="Email" VerticalAlignment="Center" />
+        <TextBox x:Name="EmailBox" Grid.Row="1" Grid.Column="1" PlaceholderText="you@example.com" />
+      </Grid>
+      <TextBlock Text="Used for the author of your commits in every repository (unless a repository overrides it)." Classes="muted" FontSize="12" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <StackPanel Spacing="8">
+      <TextBlock Text="BEHAVIOR" Classes="section" />
+      <CheckBox x:Name="PullRebaseBox" Content="Pull with rebase (the Pull button replays local commits instead of merging)" />
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <TextBlock Text="Commits loaded in History" VerticalAlignment="Center" />
+        <ComboBox x:Name="MaxCommitsBox" Width="110" />
+      </StackPanel>
+    </StackPanel>
+
+    <TextBlock x:Name="ErrorText" Foreground="#E5484D" TextWrapping="Wrap" IsVisible="False" />
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+      <Button Content="Cancel" Click="OnCancel" />
+      <Button Classes="accent" Content="Save" Padding="22,6" Click="OnSave" IsDefault="True" />
+    </StackPanel>
+  </StackPanel>
+</Window>
