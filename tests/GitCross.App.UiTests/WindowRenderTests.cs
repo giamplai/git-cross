@@ -291,6 +291,40 @@ public class WindowRenderTests
         Assert.True(search < 3_000, $"filtering took {search} ms");
     }
 
+    [AvaloniaFact]
+    public async Task Inline_highlight_and_split_view_render()
+    {
+        var repo = NewRepo();
+        var f = Path.Combine(repo, "cart.js");
+        File.WriteAllText(f, "function total(items) {\n  let total = price * 2;\n  const tax = 0.2;\n  return total + tax;\n}\n");
+        Git(repo, "add ."); Git(repo, "commit -qm cart");
+        File.WriteAllText(f, "function total(items) {\n  let total = price * 3;\n  const tax = 0.22;\n  const discount = 5;\n  return total + tax - discount;\n}\n");
+
+        var settingsPath = Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json");
+        var vm = new MainViewModel(new SettingsStore(settingsPath));
+        var w = new MainWindow(vm);
+        w.Show();
+        await vm.OpenAsync(repo);
+        vm.SelectedItem = vm.Items[0];
+        await Settle();
+        vm.SelectedUnstaged = vm.Unstaged.Single(x => x.Path == "cart.js");
+        await Settle();
+
+        var removed = vm.Diff.First(l => l.Kind == Core.Diff.DiffLineKind.Removed);
+        Assert.Equal("2", removed.Text.Substring(removed.ChangeStart, removed.ChangeLength));
+        Assert.True(vm.ShowUnified);
+        Shot(w, "diff-unified.png");
+
+        vm.IsSplitView = true;
+        await Settle();
+        Assert.True(vm.ShowSplit);
+        Assert.NotEmpty(vm.SplitRows);
+        Shot(w, "diff-split.png");
+
+        // the choice is remembered across restarts
+        Assert.True(new SettingsStore(settingsPath).Load().SplitDiff);
+    }
+
     private static string NewRepo()
     {
         var repo = Path.Combine(Path.GetTempPath(), "gxc-ui-" + Guid.NewGuid().ToString("N")[..8]);

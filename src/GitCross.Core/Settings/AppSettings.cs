@@ -19,6 +19,9 @@ public sealed class AppSettings
     /// <summary>When true the toolbar Pull button rebases instead of merging.</summary>
     public bool PullRebase { get; set; }
 
+    /// <summary>Diff viewer shows old and new side by side instead of unified.</summary>
+    public bool SplitDiff { get; set; }
+
     /// <summary>How many commits the history loads.</summary>
     public int MaxCommits { get; set; } = 2000;
 

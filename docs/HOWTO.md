@@ -167,13 +167,20 @@ Right-click a file for **Blame (at this commit)** and **File history** (section 
 
 ### The diff panel
 
-![Diff panel with line numbers](images/hunks.png)
+![Unified diff with highlighted characters](images/diff-unified.png)
 
 * Two number columns: old line and new line.
 * **Green** lines are added (`+`), **red** lines removed (`−`), **blue** bars are hunk headers, dim lines are file headers.
+* **Edited characters are highlighted** inside a changed line: when a removed line and the added line that replaces it are similar (for example `price * 2` → `price * 3`), only the characters that actually changed get a stronger background, so you can spot the real edit at a glance. Lines that were rewritten completely are not partially highlighted.
 * Long lines scroll horizontally. You can select several lines.
 * For merge commits the diff is shown against the **first parent**.
 * Untracked (new, never-added) files are shown as entirely added.
+
+### Side-by-side view
+
+![Side-by-side diff](images/diff-split.png)
+
+Click **▥ Side by side** at the right of the diff header to show the old version on the left and the new on the right (click again to go back to unified). Removed and added lines are paired in order, so edits line up across the two columns; a blank cell means a line exists on only one side. File and hunk headers span both sides and keep their **Stage hunk / Discard hunk** buttons. The mode you choose is remembered the next time you start the app.
 
 ## 9. Making a commit
 
@@ -378,6 +385,6 @@ Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete u
 * Interactive rebase (reordering/squashing/editing commits in a todo list) is not available; plain rebase onto a branch is. A rebase started elsewhere is recognized and can be continued or aborted.
 * Conflicts are resolved per file (take a side, or edit in your editor); there is no built-in three-way merge editor.
 * Staging works per file and per hunk; line-by-line selection inside a hunk is not available.
-* Diffs are plain (no syntax highlighting or side-by-side view yet).
+* Diffs highlight changes but have no language syntax coloring yet. In side-by-side mode lines are paired by position, so when a block changes many lines the pairs can look offset.
 * The history view loads a limited number of commits (2000 by default; see Settings).
 * Submodules, plugins, shell integration and localization are not implemented yet (see `docs/PORTING.md`).

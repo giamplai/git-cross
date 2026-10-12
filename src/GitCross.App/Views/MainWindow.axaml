@@ -295,11 +295,11 @@
                     </ListBox>
                   </DockPanel>
                   <DockPanel Grid.Column="2">
-                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
+                    <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
                       <Button Classes="accent" Content="Commit  (Ctrl+Enter)" Padding="14,7" Command="{Binding CommitCommand}" />
-                      <CheckBox Content="Amend last commit" IsChecked="{Binding Amend}" />
+                      <CheckBox Content="Amend last commit" IsChecked="{Binding Amend}" Margin="12,0,12,0" />
                       <TextBlock Text="{Binding SummaryLength, StringFormat='{}{0}/72'}" Classes="muted" VerticalAlignment="Center" FontSize="12" />
-                    </StackPanel>
+                    </WrapPanel>
                     <TextBlock DockPanel.Dock="Top" Text="Commit message" FontWeight="SemiBold" Margin="0,0,0,6" />
                     <TextBox Text="{Binding CommitMessage}" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="Summary on the first line, details below…">
                       <TextBox.KeyBindings>
@@ -339,18 +339,23 @@
           <!-- Diff -->
           <Border Grid.Row="3" Classes="panel" ClipToBounds="True">
             <DockPanel>
-              <Border DockPanel.Dock="Top" Padding="12,6" Background="{DynamicResource PanelAltBrush}" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource LineBrush}">
-                <TextBlock Text="{Binding DiffTitle, FallbackValue=Changes}" Classes="mono" FontWeight="SemiBold" />
+              <Border DockPanel.Dock="Top" Padding="12,4" Background="{DynamicResource PanelAltBrush}" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource LineBrush}">
+                <DockPanel>
+                  <ToggleButton DockPanel.Dock="Right" Classes="mini" IsChecked="{Binding IsSplitView}" ToolTip.Tip="Show old and new side by side">
+                    <TextBlock Text="▥  Side by side" FontSize="12" />
+                  </ToggleButton>
+                  <TextBlock Text="{Binding DiffTitle, FallbackValue=Changes}" Classes="mono" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                </DockPanel>
               </Border>
               <Grid>
-                <ListBox Classes="diff" ItemsSource="{Binding Diff}" SelectionMode="Multiple" ScrollViewer.HorizontalScrollBarVisibility="Auto" IsVisible="{Binding HasDiff}">
+                <ListBox Classes="diff" ItemsSource="{Binding Diff}" SelectionMode="Multiple" ScrollViewer.HorizontalScrollBarVisibility="Auto" IsVisible="{Binding ShowUnified}">
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="d:DiffLine">
                       <Grid ColumnDefinitions="48,48,18,*" Background="{Binding Kind, Converter={x:Static c:Converters.DiffBackground}}" Opacity="{Binding Kind, Converter={x:Static c:Converters.DiffOpacity}}">
                         <TextBlock Text="{Binding OldNumber, Converter={x:Static c:Converters.LineNumber}}" Classes="mono muted" TextAlignment="Right" Margin="0,0,8,0" />
                         <TextBlock Grid.Column="1" Text="{Binding NewNumber, Converter={x:Static c:Converters.LineNumber}}" Classes="mono muted" TextAlignment="Right" Margin="0,0,8,0" />
                         <TextBlock Grid.Column="2" Text="{Binding Kind, Converter={x:Static c:Converters.DiffSign}}" Classes="mono" />
-                        <TextBlock Grid.Column="3" Text="{Binding Text}" Classes="mono" />
+                        <c:DiffText Grid.Column="3" Source="{Binding Text}" Start="{Binding ChangeStart}" Length="{Binding ChangeLength}" Kind="{Binding Kind}" Classes="mono" />
                         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" Margin="0,1,12,1">
                           <StackPanel.IsVisible>
                             <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -363,6 +368,45 @@
                           <Button Classes="mini" Content="Discard hunk" IsVisible="{Binding #Root.((vm:MainViewModel)DataContext).CanDiscardHunk}"
                                   Command="{Binding #Root.((vm:MainViewModel)DataContext).HunkDiscardCommand}" CommandParameter="{Binding HunkIndex}" />
                         </StackPanel>
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+
+                <ListBox Classes="diff" ItemsSource="{Binding SplitRows}" SelectionMode="Multiple" IsVisible="{Binding ShowSplit}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="d:SplitRow">
+                      <Grid>
+                        <!-- file header / hunk header spans both sides -->
+                        <Grid IsVisible="{Binding IsHeader}" Background="{Binding Header.Kind, Converter={x:Static c:Converters.DiffBackground}}" Opacity="{Binding Header.Kind, Converter={x:Static c:Converters.DiffOpacity}}">
+                          <TextBlock Text="{Binding Header.Text}" Classes="mono" Margin="10,0,0,0" TextTrimming="CharacterEllipsis" />
+                          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" Margin="0,1,12,1">
+                            <StackPanel.IsVisible>
+                              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="Header.IsHunk" />
+                                <Binding Path="#Root.((vm:MainViewModel)DataContext).HunkActionsEnabled" />
+                              </MultiBinding>
+                            </StackPanel.IsVisible>
+                            <Button Classes="mini" Content="{Binding #Root.((vm:MainViewModel)DataContext).HunkPrimaryText}"
+                                    Command="{Binding #Root.((vm:MainViewModel)DataContext).HunkPrimaryCommand}" CommandParameter="{Binding Header.HunkIndex}" />
+                            <Button Classes="mini" Content="Discard hunk" IsVisible="{Binding #Root.((vm:MainViewModel)DataContext).CanDiscardHunk}"
+                                    Command="{Binding #Root.((vm:MainViewModel)DataContext).HunkDiscardCommand}" CommandParameter="{Binding Header.HunkIndex}" />
+                          </StackPanel>
+                        </Grid>
+                        <!-- old (left) and new (right) -->
+                        <Grid IsVisible="{Binding !IsHeader}" ColumnDefinitions="*,1,*">
+                          <Grid Background="{DynamicResource PanelAltBrush}" ColumnDefinitions="44,*" ClipToBounds="True">
+                            <Border Grid.ColumnSpan="2" Background="{Binding Left.Kind, Converter={x:Static c:Converters.DiffBackground}}" />
+                            <TextBlock Text="{Binding Left.OldNumber, Converter={x:Static c:Converters.LineNumber}}" Classes="mono muted" TextAlignment="Right" Margin="0,0,8,0" />
+                            <c:DiffText Grid.Column="1" Source="{Binding Left.Text}" Start="{Binding Left.ChangeStart}" Length="{Binding Left.ChangeLength}" Kind="{Binding Left.Kind}" Classes="mono" />
+                          </Grid>
+                          <Border Grid.Column="1" Background="{DynamicResource LineBrush}" />
+                          <Grid Grid.Column="2" Background="{DynamicResource PanelAltBrush}" ColumnDefinitions="44,*" ClipToBounds="True">
+                            <Border Grid.ColumnSpan="2" Background="{Binding Right.Kind, Converter={x:Static c:Converters.DiffBackground}}" />
+                            <TextBlock Text="{Binding Right.NewNumber, Converter={x:Static c:Converters.LineNumber}}" Classes="mono muted" TextAlignment="Right" Margin="0,0,8,0" />
+                            <c:DiffText Grid.Column="1" Source="{Binding Right.Text}" Start="{Binding Right.ChangeStart}" Length="{Binding Right.ChangeLength}" Kind="{Binding Right.Kind}" Classes="mono" />
+                          </Grid>
+                        </Grid>
                       </Grid>
                     </DataTemplate>
                   </ListBox.ItemTemplate>

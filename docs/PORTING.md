@@ -7,7 +7,7 @@
 | Commit search | Done | subject/author/sha/ref; hides graph while filtering |
 | Branches / remotes / tags sidebar, checkout | Done | |
 | Create branch, checkout commit | Done | |
-| Commit diff viewer | Done | line numbers, colored; no side-by-side / syntax highlight yet |
+| Commit diff viewer | Done | line numbers, intra-line highlights, side-by-side toggle; no syntax highlighting yet |
 | Stage / unstage / commit / amend | Done | file-level only |
 | Fetch / Pull / Push | Done | no progress output, no credentials UI |
 | Stash push/pop/apply/drop + list | Done | sidebar section, context menu; untracked files in a stash are not shown |

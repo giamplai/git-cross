@@ -105,6 +105,41 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<FileChange> Unstaged { get; } = [];
     public ObservableCollection<FileChange> Staged { get; } = [];
     public ObservableCollection<DiffLine> Diff { get; } = [];
+    public ObservableCollection<SplitRow> SplitRows { get; } = [];
+
+    public bool IsSplitView
+    {
+        get => _settings.SplitDiff;
+        set
+        {
+            if (_settings.SplitDiff == value) { return; }
+            _settings.SplitDiff = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsUnifiedView));
+            OnPropertyChanged(nameof(ShowSplit));
+            OnPropertyChanged(nameof(ShowUnified));
+            RebuildSplit();
+            SaveSettings();
+        }
+    }
+
+    public bool IsUnifiedView => !IsSplitView;
+    public bool ShowSplit => IsSplitView && HasDiff;
+    public bool ShowUnified => !IsSplitView && HasDiff;
+
+    private void RebuildSplit()
+    {
+        SplitRows.Clear();
+        if (!IsSplitView)
+        {
+            return; // built lazily: only the visible mode pays for its layout
+        }
+
+        foreach (var r in SideBySide.Build(Diff.ToList()))
+        {
+            SplitRows.Add(r);
+        }
+    }
     public ObservableCollection<RecentRepo> Recent { get; } = [];
 
     /// <summary>Supplied by the view to ask before destructive actions (title, message → confirmed). Unset = proceed.</summary>
@@ -473,7 +508,7 @@ public partial class MainViewModel : ObservableObject
         Diff.Clear();
         CommitInfo = "";
         DiffTitle = "";
-        OnPropertyChanged(nameof(HasDiff));
+        NotifyDiffChanged();
     }
 
     private async Task LoadCommitAsync(HistoryItem item)
@@ -572,7 +607,7 @@ public partial class MainViewModel : ObservableObject
             }
 
             Replace(Diff, ConflictParser.Parse(text));
-            OnPropertyChanged(nameof(HasDiff));
+            NotifyDiffChanged();
         });
     }
 
@@ -593,8 +628,16 @@ public partial class MainViewModel : ObservableObject
             }
 
             Replace(Diff, DiffParser.Parse(text));
-            OnPropertyChanged(nameof(HasDiff));
+            NotifyDiffChanged();
         });
+    }
+
+    private void NotifyDiffChanged()
+    {
+        RebuildSplit();
+        OnPropertyChanged(nameof(HasDiff));
+        OnPropertyChanged(nameof(ShowSplit));
+        OnPropertyChanged(nameof(ShowUnified));
     }
 
     private void NotifyHunkState()
