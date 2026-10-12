@@ -206,6 +206,26 @@ public partial class MainWindow : Window
         }
     }
 
+    private static Core.Models.FileChange? FileOf(object? sender) => (sender as Control)?.DataContext as Core.Models.FileChange;
+
+    private async void OnAcceptOurs(object? s, RoutedEventArgs e)
+    {
+        if (FileOf(s) is { } f) { await _vm.ResolveAsync(f, ours: true); }
+    }
+
+    private async void OnAcceptTheirs(object? s, RoutedEventArgs e)
+    {
+        if (FileOf(s) is { } f) { await _vm.ResolveAsync(f, ours: false); }
+    }
+
+    private async void OnOpenFile(object? s, RoutedEventArgs e)
+    {
+        if (FileOf(s) is { } f && _vm.FullPath(f.Path) is { } full && TopLevel.GetTopLevel(this)?.Launcher is { } launcher)
+        {
+            await launcher.LaunchFileInfoAsync(new FileInfo(full));
+        }
+    }
+
     private sealed class FocusSearchCommand(Control target) : System.Windows.Input.ICommand
     {
         public event EventHandler? CanExecuteChanged { add { } remove { } }

@@ -205,6 +205,42 @@ public class WindowRenderTests
         Assert.Equal("Add login screen", vm.SelectedItem?.Subject);
     }
 
+    [AvaloniaFact]
+    public async Task Conflicting_merge_shows_banner_and_can_be_resolved()
+    {
+        var repo = Path.Combine(Path.GetTempPath(), "gxc-ui-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(repo);
+        Git(repo, "init -q -b main"); Git(repo, "config user.name Ada"); Git(repo, "config user.email a@x");
+        File.WriteAllText(Path.Combine(repo, "f.txt"), "base\n"); Git(repo, "add ."); Git(repo, "commit -qm base");
+        Git(repo, "checkout -qb topic"); File.WriteAllText(Path.Combine(repo, "f.txt"), "topic\n"); Git(repo, "commit -qam topic");
+        Git(repo, "checkout -q main"); File.WriteAllText(Path.Combine(repo, "f.txt"), "main\n"); Git(repo, "commit -qam main");
+
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        var w = new MainWindow(vm);
+        w.Show();
+        await vm.OpenAsync(repo);
+
+        await vm.MergeRefCommand.ExecuteAsync(vm.Sidebar.First(e => e.Ref?.Name == "topic").Ref);
+        await Settle();
+        Assert.True(vm.HasOperation);
+        Assert.Equal(1, vm.ConflictCount);
+        Assert.False(vm.CanContinue);
+        Assert.Contains("stopped", vm.StatusText);
+
+        vm.SelectedUnstaged = vm.Unstaged.Single();
+        await Settle();
+        Assert.Contains(vm.Diff, l => l.Kind == Core.Diff.DiffLineKind.Added && l.Text == "topic");
+        Shot(w, "10-conflict.png");
+
+        await vm.ResolveAsync(vm.Unstaged.Single(), ours: false);
+        await Settle();
+        Assert.True(vm.CanContinue);
+        await vm.ContinueOperationCommand.ExecuteAsync(null);
+        await Settle();
+        Assert.False(vm.HasOperation);
+        Assert.Contains(vm.Items, i => i.Subject.StartsWith("Merge"));
+    }
+
     private static void Git(string dir, string args)
     {
         var psi = new ProcessStartInfo("git", args) { WorkingDirectory = dir, RedirectStandardError = true, RedirectStandardOutput = true };

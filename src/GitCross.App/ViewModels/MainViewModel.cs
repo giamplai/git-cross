@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GitCross.Core.Conflicts;
 using GitCross.Core.Diff;
 using GitCross.Core.Git;
 using GitCross.Core.Graph;
@@ -59,6 +60,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _newBranchName = "";
     [ObservableProperty] private string _diffTitle = "";
     [ObservableProperty] private double _graphWidth = 40;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasOperation)), NotifyPropertyChangedFor(nameof(OperationText))] private GitOperation _operation;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(OperationText)), NotifyPropertyChangedFor(nameof(CanContinue))] private int _conflictCount;
     [ObservableProperty] private string _blameTitle = "";
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasFileFilter)), NotifyPropertyChangedFor(nameof(FileFilterText))] private string? _fileFilterPath;
     [ObservableProperty] private ThemeVariant _themeVariant = ThemeVariant.Default;
@@ -68,6 +71,24 @@ public partial class MainViewModel : ObservableObject
     public string StagedHeader => $"Staged changes ({Staged.Count})";
     public int SummaryLength => CommitMessage.Split('\n')[0].Length;
     public double HeaderGraphWidth => _fileFilter is null && SearchText.Trim().Length == 0 ? GraphWidth : 0;
+    public bool HasOperation => Operation != GitOperation.None;
+    public bool CanContinue => ConflictCount == 0;
+    public string OperationText => Operation switch
+    {
+        GitOperation.None => "",
+        _ => ConflictCount > 0
+            ? $"{OperationName(Operation)} in progress — {ConflictCount} conflicted file{(ConflictCount == 1 ? "" : "s")} to resolve"
+            : $"{OperationName(Operation)} in progress — all conflicts resolved, ready to continue",
+    };
+
+    private static string OperationName(GitOperation op) => op switch
+    {
+        GitOperation.CherryPick => "Cherry-pick",
+        GitOperation.Revert => "Revert",
+        GitOperation.Rebase => "Rebase",
+        _ => "Merge",
+    };
+
     public bool HasFileFilter => FileFilterPath is not null;
     public string FileFilterText => $"History of {FileFilterPath}";
     public bool HasDiff => Diff.Count > 0;
@@ -263,11 +284,19 @@ public partial class MainViewModel : ObservableObject
             await Task.WhenAll(commitsTask, refsTask, statusTask, stashTask);
             var (commits, refs, status) = (commitsTask.Result, refsTask.Result, statusTask.Result);
             _stashes = stashTask.Result;
+            var op = await repo.GetOperationAsync();
             _refs = refs;
 
             Replace(Unstaged, status.Unstaged);
             Replace(Staged, status.Staged);
             NotifyCounts();
+            ConflictCount = status.Unstaged.Count(f => f.Kind == ChangeKind.Conflicted);
+            if (op != GitOperation.None && Operation == GitOperation.None && ConflictCount > 0)
+            {
+                SelectedTab = 1; // jump to the files that need attention
+            }
+
+            Operation = op;
 
             BranchText = status.Branch ?? "detached HEAD";
             SyncText = status.Ahead + status.Behind > 0 ? $"↑{status.Ahead}  ↓{status.Behind}" : "";
@@ -482,6 +511,12 @@ public partial class MainViewModel : ObservableObject
         }
 
         SelectedStaged = null;
+        if (value.Kind == ChangeKind.Conflicted)
+        {
+            _ = ShowConflictAsync(value.Path);
+            return;
+        }
+
         var untracked = value.Kind == ChangeKind.Untracked;
         _ = ShowDiffAsync(untracked ? DiffSource.Commit : DiffSource.Unstaged, value.Path, () => _repo!.GetWorkingDiffAsync(value.Path, false, untracked));
     }
@@ -498,6 +533,27 @@ public partial class MainViewModel : ObservableObject
     }
 
     partial void OnCommitMessageChanged(string value) => OnPropertyChanged(nameof(SummaryLength));
+
+    private async Task ShowConflictAsync(string path)
+    {
+        var v = ++_version;
+        Diff.Clear();
+        DiffTitle = $"{path}  ·  conflict: red = ours (current branch), green = theirs (incoming)";
+        _diffSource = DiffSource.None;
+        _diffPath = path;
+        NotifyHunkState();
+        await Guard(async () =>
+        {
+            var text = await File.ReadAllTextAsync(_repo!.ResolvePath(path));
+            if (v != _version)
+            {
+                return;
+            }
+
+            Replace(Diff, ConflictParser.Parse(text));
+            OnPropertyChanged(nameof(HasDiff));
+        });
+    }
 
     private async Task ShowDiffAsync(DiffSource source, string title, Func<Task<string>> load)
     {
@@ -601,6 +657,28 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    public Task ResolveAsync(FileChange f, bool ours) => Mutate(() => _repo!.ResolveAsync(f.Path, ours), f);
+
+    public string? FullPath(string relative) => _repo?.ResolvePath(relative);
+
+    [RelayCommand]
+    private Task ContinueOperationAsync()
+    {
+        var op = Operation;
+        return op == GitOperation.None ? Task.CompletedTask : Mutate(() => _repo!.ContinueAsync(op), op);
+    }
+
+    [RelayCommand]
+    private async Task AbortOperationAsync()
+    {
+        var op = Operation;
+        if (op != GitOperation.None
+            && await ConfirmAsync($"Abort {OperationName(op).ToLowerInvariant()}", "Abandon the operation and restore the state from before it started? Resolutions made so far are lost."))
+        {
+            await Mutate(() => _repo!.AbortAsync(op), op);
+        }
+    }
+
     [RelayCommand] private Task FetchAsync() => Mutate(() => _repo!.FetchAsync(), true);
 
     [RelayCommand] private Task PullAsync() => Mutate(() => _repo!.PullAsync(), true);
@@ -666,8 +744,19 @@ public partial class MainViewModel : ObservableObject
             ? Task.CompletedTask
             : Guard(async () =>
             {
-                await action();
-                await RefreshAsync();
+                try
+                {
+                    await action();
+                    await RefreshAsync();
+                }
+                catch (GitException ex)
+                {
+                    // A failed merge/cherry-pick leaves the repo mid-operation: show that state instead of just an error.
+                    await RefreshAsync();
+                    Fail(Operation != GitOperation.None && ConflictCount > 0
+                        ? $"{OperationName(Operation)} stopped: {ConflictCount} file(s) have conflicts. Resolve them, then Continue (or Abort)."
+                        : ex.Message);
+                }
             });
 
     private async Task Guard(Func<Task> work)
