@@ -2,18 +2,19 @@
 
 | Feature | Status | Notes |
 |---|---|---|
-| Open repo / recent list | Done | recents not persisted yet |
-| Commit history + graph | Done | lane layout, 2000 commit cap, no paging |
+| Open repo / recent list | Done | persisted in settings.json, reopens last repo |
+| Commit history + graph | Done | lane layout, 2000 commit cap, no paging; ref chips, avatars, relative dates |
+| Commit search | Done | subject/author/sha/ref; hides graph while filtering |
 | Branches / remotes / tags sidebar, checkout | Done | |
 | Create branch, checkout commit | Done | |
-| Commit diff viewer | Done | plain colored lines, no side-by-side |
+| Commit diff viewer | Done | line numbers, colored; no side-by-side / syntax highlight yet |
 | Stage / unstage / commit / amend | Done | file-level only |
 | Fetch / Pull / Push | Done | no progress output, no credentials UI |
 | Stash push/pop | Done | no stash list |
-| Ref labels on graph rows | Todo | |
 | Hunk/line staging | Todo | |
-| Settings persistence, themes | Todo | |
-| Clone / init dialogs | Todo | Core API exists |
+| Themes (system/light/dark) | Done | persisted |
+| Settings dialog | Todo | |
+| Clone / init | Done | clone dialog, init via folder picker |
 | Merge/rebase/cherry-pick/revert/reset | Todo | |
 | Conflict resolution | Todo | |
 | Blame / file history | Todo | |
