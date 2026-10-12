@@ -193,6 +193,24 @@ public sealed class GitRepository
         await ApplyPatchAsync(patch, toIndex: true, reverse: unstage);
     }
 
+    /// <summary>Stage or unstage only the selected changed lines (hunk index → body line indexes).</summary>
+    public async Task StageLinesAsync(string path, IReadOnlyDictionary<int, ISet<int>> selection, bool unstage)
+    {
+        var diff = await GetWorkingDiffAsync(path, staged: unstage);
+        var patch = PatchBuilder.BuildLinePatch(diff, selection, unstage ? PartialMode.Reverse : PartialMode.Stage)
+            ?? throw new InvalidOperationException("The selected lines no longer exist; refresh and retry.");
+        await ApplyPatchAsync(patch, toIndex: true, reverse: unstage);
+    }
+
+    /// <summary>Permanently revert only the selected changed lines in the work tree.</summary>
+    public async Task DiscardLinesAsync(string path, IReadOnlyDictionary<int, ISet<int>> selection)
+    {
+        var diff = await GetWorkingDiffAsync(path, staged: false);
+        var patch = PatchBuilder.BuildLinePatch(diff, selection, PartialMode.Reverse)
+            ?? throw new InvalidOperationException("The selected lines no longer exist; refresh and retry.");
+        await ApplyPatchAsync(patch, toIndex: false, reverse: true);
+    }
+
     public async Task DiscardHunkAsync(string path, int hunkIndex)
     {
         var diff = await GetWorkingDiffAsync(path, staged: false);
