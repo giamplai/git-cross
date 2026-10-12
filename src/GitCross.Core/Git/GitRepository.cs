@@ -63,7 +63,8 @@ public sealed class GitRepository
         List<string> a = ["log", "--topo-order", $"--max-count={max}", $"--format={Parsers.LogFormat}"];
         if (all)
         {
-            a.Add("--all");
+            // Stash commits (and their internal index/untracked parents) would clutter the graph.
+            a.AddRange(["--exclude=refs/stash", "--all"]);
         }
 
         var r = await _git.RunAsync(a, null, default);
@@ -134,6 +135,15 @@ public sealed class GitRepository
         => _git.OutAsync(message is null ? ["stash", "push", "-u"] : ["stash", "push", "-u", "-m", message]);
 
     public Task StashPopAsync() => _git.OutAsync("stash", "pop");
+
+    public async Task<IReadOnlyList<StashEntry>> GetStashesAsync()
+        => Parsers.ParseStashes(await _git.OutAsync("stash", "list", $"--format={Parsers.StashFormat}")).ToList();
+
+    public Task StashApplyAsync(StashEntry s) => _git.OutAsync("stash", "apply", s.Ref);
+
+    public Task StashPopAsync(StashEntry s) => _git.OutAsync("stash", "pop", s.Ref);
+
+    public Task StashDropAsync(StashEntry s) => _git.OutAsync("stash", "drop", s.Ref);
 
     /// <summary>Applies a patch from memory. <paramref name="toIndex"/> targets the index (staging), otherwise the work tree.</summary>
     public async Task ApplyPatchAsync(string patch, bool toIndex, bool reverse)

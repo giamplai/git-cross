@@ -125,3 +125,34 @@ public class HistoryEditingTests
         }
     }
 }
+
+public class StashTests
+{
+    [Fact]
+    public void Parses_stash_list()
+    {
+        var l = Parsers.ParseStashes("aaa\u001fWIP on main: 1 x\u001e\nbbb\u001fOn main: named\u001e\n").ToList();
+        Assert.Equal(["stash@{0}", "stash@{1}"], l.Select(s => s.Ref));
+        Assert.Equal("On main: named", l[1].Message);
+    }
+
+    [Fact]
+    public async Task Stash_list_apply_drop_and_log_excludes_stash_commits()
+    {
+        var (t, r) = await TempRepo.CreateAsync();
+        using (t)
+        {
+            t.Write("a.txt", "1"); await r.StageAsync(["a.txt"]); await r.CommitAsync("c1");
+            t.Write("a.txt", "2");
+            await r.StashPushAsync("my work");
+            var list = await r.GetStashesAsync();
+            Assert.Contains("my work", list.Single().Message);
+            Assert.Single(await r.GetLogAsync()); // stash commits are not part of history
+
+            await r.StashApplyAsync(list[0]);
+            Assert.Equal("2", File.ReadAllText(Path.Combine(t.Path, "a.txt")));
+            await r.StashDropAsync(list[0]);
+            Assert.Empty(await r.GetStashesAsync());
+        }
+    }
+}

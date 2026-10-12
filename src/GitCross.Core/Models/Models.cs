@@ -25,3 +25,9 @@ public sealed record WorkingStatus(
     int Behind,
     IReadOnlyList<FileChange> Staged,
     IReadOnlyList<FileChange> Unstaged);
+
+/// <summary>One entry of <c>git stash list</c>; <see cref="Ref"/> is e.g. "stash@{0}".</summary>
+public sealed record StashEntry(int Index, string Message, string Sha)
+{
+    public string Ref => $"stash@{{{Index}}}";
+}

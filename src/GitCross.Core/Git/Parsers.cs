@@ -64,6 +64,22 @@ public static class Parsers
         }
     }
 
+    public const string StashFormat = "%H%x1f%gs%x1e";
+
+    /// <summary>Parses <c>git stash list --format=%H%x1f%gs%x1e</c> (newest first = index 0).</summary>
+    public static IEnumerable<StashEntry> ParseStashes(string output)
+    {
+        var i = 0;
+        foreach (var rec in output.Split(RecordSep, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var f = rec.Trim('\n', '\r').Split(FieldSep);
+            if (f.Length >= 2)
+            {
+                yield return new StashEntry(i++, f[1], f[0]);
+            }
+        }
+    }
+
     /// <summary>Parses <c>git status --porcelain=v1 -z --branch</c>.</summary>
     public static WorkingStatus ParseStatus(string output)
     {
