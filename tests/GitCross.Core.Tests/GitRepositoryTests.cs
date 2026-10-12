@@ -56,3 +56,14 @@ public class GitRepositoryTests
         using (t) { Assert.Empty(await repo.GetLogAsync()); }
     }
 }
+
+public class CloneNamingTests
+{
+    [Theory]
+    [InlineData("https://github.com/gitextensions/gitextensions.git", "gitextensions")]
+    [InlineData("git@github.com:user/my-repo.git", "my-repo")]
+    [InlineData("https://host/path/repo/", "repo")]
+    [InlineData("/srv/git/local", "local")]
+    public void Suggests_folder_name(string url, string expected)
+        => Assert.Equal(expected, Git.GitRepository.SuggestFolderName(url));
+}

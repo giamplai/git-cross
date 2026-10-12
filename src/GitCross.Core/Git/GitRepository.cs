@@ -36,6 +36,19 @@ public sealed class GitRepository
         return (await OpenAsync(path))!;
     }
 
+    /// <summary>Folder name git would pick for a clone URL ("https://x/y/repo.git" → "repo").</summary>
+    public static string SuggestFolderName(string url)
+    {
+        var u = url.Trim().TrimEnd('/', '\\');
+        if (u.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
+        {
+            u = u[..^4];
+        }
+
+        var i = u.LastIndexOfAny(['/', '\\', ':']);
+        return i >= 0 ? u[(i + 1)..] : u;
+    }
+
     public static async Task<GitRepository> CloneAsync(string url, string target)
     {
         var parent = Path.GetDirectoryName(Path.GetFullPath(target))!;
