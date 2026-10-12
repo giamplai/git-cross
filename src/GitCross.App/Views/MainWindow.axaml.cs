@@ -145,6 +145,25 @@ public partial class MainWindow : Window
         if (ItemOf(s) is { } i) { await _vm.RevertAsync(i.Commit!.Sha); }
     }
 
+    private async void OnCommitInteractiveRebase(object? s, RoutedEventArgs e)
+    {
+        if (ItemOf(s) is not { } i)
+        {
+            return;
+        }
+
+        var plan = await _vm.PrepareInteractiveRebaseAsync(i.Commit!.Sha, $"{i.ShortSha} “{i.Subject}”");
+        if (plan is null)
+        {
+            return;
+        }
+
+        if (await new RebaseWindow(plan).ShowDialog<IReadOnlyList<Core.Rebase.RebaseTodoItem>?>(this) is { } todo)
+        {
+            await _vm.InteractiveRebaseAsync(i.Commit!.Sha, todo);
+        }
+    }
+
     private async void OnCommitTag(object? s, RoutedEventArgs e)
     {
         if (ItemOf(s) is not { } i)

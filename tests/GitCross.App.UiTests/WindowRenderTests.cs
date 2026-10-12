@@ -366,6 +366,95 @@ public class WindowRenderTests
         Assert.Equal(2, vm.Diff.Count(l => l.Kind == Core.Diff.DiffLineKind.Added)); // NEW1 and NEW3 remain unstaged
     }
 
+    private static string FeatureRepo()
+    {
+        var repo = NewRepo();
+        foreach (var (file, msg) in new[] { ("login.txt", "Add login form"), ("login2.txt", "Fix typo in login form"), ("logout.txt", "Add logout button"), ("debug.txt", "WIP debug output") })
+        {
+            File.WriteAllText(Path.Combine(repo, file), file); Git(repo, "add ."); Git(repo, $"commit -qm \"{msg}\"");
+        }
+
+        return repo;
+    }
+
+    [AvaloniaFact]
+    public async Task Interactive_rebase_dialog_validates_and_renders()
+    {
+        var repo = FeatureRepo();
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        await vm.OpenAsync(repo);
+        var baseSha = vm.Items.Last(i => !i.IsWorkingDir).Commit!.Sha; // "base"
+        var plan = await vm.PrepareInteractiveRebaseAsync(baseSha, $"{baseSha[..8]} “base”");
+        Assert.NotNull(plan);
+        Assert.Equal(["Add login form", "Fix typo in login form", "Add logout button", "WIP debug output"], plan!.Rows.Select(r => r.Subject));
+        Assert.True(plan.CanStart);
+
+        plan.Rows[0].Action = Core.Rebase.RebaseAction.Squash;       // first commit cannot be squashed
+        Assert.False(plan.CanStart);
+        Assert.Contains("first commit", plan.Problem);
+        plan.Rows[0].Action = Core.Rebase.RebaseAction.Pick;
+
+        plan.Rows[1].Action = Core.Rebase.RebaseAction.Fixup;
+        plan.Rows[2].Action = Core.Rebase.RebaseAction.Reword;
+        plan.Rows[2].Message = "Add a logout button to the header";
+        plan.Rows[3].Action = Core.Rebase.RebaseAction.Drop;
+        plan.Selected = plan.Rows[2];
+
+        var dlg = new RebaseWindow(plan);
+        dlg.Show();
+        await Settle();
+        Assert.True(plan.CanStart);
+        Assert.Equal("Add a logout button to the header", plan.Rows[2].Message); // async prefill must not clobber typed text
+        Shot(dlg, "interactive-rebase.png");
+        dlg.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task Choosing_reword_prefills_the_current_message()
+    {
+        var repo = FeatureRepo();
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        await vm.OpenAsync(repo);
+        var plan = (await vm.PrepareInteractiveRebaseAsync(vm.Items.Last(i => !i.IsWorkingDir).Commit!.Sha, "base"))!;
+        plan.Rows[0].Action = Core.Rebase.RebaseAction.Reword;
+        Assert.False(plan.CanStart); // empty message is rejected until the prefill arrives or the user types
+        await Settle();
+        Assert.Equal("Add login form", plan.Rows[0].Message);
+        Assert.True(plan.CanStart);
+    }
+
+    [AvaloniaFact]
+    public async Task Interactive_rebase_flow_rewrites_history()
+    {
+        var repo = FeatureRepo();
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        await vm.OpenAsync(repo);
+        var baseSha = vm.Items.Last(i => !i.IsWorkingDir).Commit!.Sha;
+        var plan = (await vm.PrepareInteractiveRebaseAsync(baseSha, "base"))!;
+
+        plan.Rows[1].Action = Core.Rebase.RebaseAction.Fixup;
+        plan.Rows[2].Action = Core.Rebase.RebaseAction.Reword;
+        plan.Rows[2].Message = "Add a logout button to the header";
+        plan.Rows[3].Action = Core.Rebase.RebaseAction.Drop;
+        await vm.InteractiveRebaseAsync(baseSha, plan.ToTodo());
+        await Settle();
+
+        Assert.False(vm.IsError, vm.StatusText);
+        Assert.Equal(["Add a logout button to the header", "Add login form", "base"], vm.Items.Where(i => !i.IsWorkingDir).Select(i => i.Subject));
+        Assert.False(File.Exists(Path.Combine(repo, "debug.txt")));
+        Assert.True(File.Exists(Path.Combine(repo, "login2.txt"))); // fixup kept the file content
+    }
+
+    [AvaloniaFact]
+    public async Task Rebase_with_no_commits_reports_instead_of_opening_dialog()
+    {
+        var repo = NewRepo();
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        await vm.OpenAsync(repo);
+        Assert.Null(await vm.PrepareInteractiveRebaseAsync(vm.Items[0].Commit!.Sha, "base"));
+        Assert.Contains("No commits", vm.StatusText);
+    }
+
     private static string NewRepo()
     {
         var repo = Path.Combine(Path.GetTempPath(), "gxc-ui-" + Guid.NewGuid().ToString("N")[..8]);

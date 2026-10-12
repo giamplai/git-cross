@@ -7,6 +7,7 @@ using GitCross.Core.Diff;
 using GitCross.Core.Git;
 using GitCross.Core.Graph;
 using GitCross.Core.Models;
+using GitCross.Core.Rebase;
 using GitCross.Core.Settings;
 using GitCross.Core.Util;
 
@@ -811,6 +812,28 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>Builds the plan for an interactive rebase onto a commit, or null (with a status message) when there is nothing to replay.</summary>
+    public async Task<RebaseViewModel?> PrepareInteractiveRebaseAsync(string onto, string label)
+    {
+        if (_repo is not { } repo)
+        {
+            return null;
+        }
+
+        IReadOnlyList<Commit> commits = [];
+        await Guard(async () => commits = await repo.GetRebaseCandidatesAsync(onto));
+        if (commits.Count == 0)
+        {
+            IsError = false;
+            StatusText = "No commits to rebase after that commit on the current branch.";
+            return null;
+        }
+
+        return new RebaseViewModel(label, commits, sha => repo.GetCommitMessageAsync(sha));
+    }
+
+    public Task InteractiveRebaseAsync(string onto, IReadOnlyList<RebaseTodoItem> todo) => Mutate(() => _repo!.InteractiveRebaseAsync(onto, todo), todo);
+
     public Task RebaseOntoAsync(GitRef r) => Mutate(() => _repo!.RebaseAsync(r.Name), r);
 
     public string CurrentBranch => BranchText;
@@ -884,6 +907,10 @@ public partial class MainViewModel : ObservableObject
                 {
                     await action();
                     await RefreshAsync();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Fail(ex.Message);
                 }
                 catch (GitException ex)
                 {

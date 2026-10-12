@@ -169,6 +169,7 @@
                                 <Separator />
                                 <MenuItem Header="Cherry-pick onto current branch" Click="OnCommitCherryPick" />
                                 <MenuItem Header="Revert this commit" Click="OnCommitRevert" />
+                                <MenuItem Header="Interactive rebase onto this commit…" Click="OnCommitInteractiveRebase" />
                                 <MenuItem Header="Reset current branch to here">
                                   <MenuItem Header="Soft (keep index and files)" Click="OnResetSoft" />
                                   <MenuItem Header="Mixed (keep files)" Click="OnResetMixed" />

@@ -38,6 +38,12 @@ public static class Converters
 
     public static readonly IValueConverter StripeBackground = new Func<bool, IBrush>(b => b ? new SolidColorBrush(Color.FromArgb(0x14, 0x80, 0x90, 0xB0)) : Brushes.Transparent).AsConverter();
 
+    public static readonly IValueConverter DroppedOpacity = new Func<bool, double>(d => d ? 0.45 : 1.0).AsConverter();
+
+    public static readonly IValueConverter FoldedIndent = new Func<bool, Avalonia.Thickness>(f => f ? new Avalonia.Thickness(22, 0, 0, 0) : default).AsConverter();
+
+    public static readonly IValueConverter StrikeIf = new Func<bool, Avalonia.Media.TextDecorationCollection?>(d => d ? Avalonia.Media.TextDecorations.Strikethrough : null).AsConverter();
+
     public static readonly IValueConverter LineNumber = new Func<int?, string>(n => n?.ToString(CultureInfo.InvariantCulture) ?? "").AsConverter();
 
     public static readonly IValueConverter ChangeLetter = new Func<ChangeKind, string>(k => k switch

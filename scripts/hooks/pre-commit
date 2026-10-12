@@ -9,6 +9,15 @@ if [ -n "$code" ] && ! echo "$staged" | grep -qx 'docs/HOWTO.md' && [ -z "${DOCS
   exit 1
 fi
 
+# Never commit a tree that does not build (cheap incremental build; tests run via scripts/check.sh).
+if echo "$staged" | grep -qE '\.(cs|axaml|csproj|props)$'; then
+  export PATH="$HOME/.dotnet:$PATH"
+  if ! dotnet build --nologo -v q >/dev/null 2>&1; then
+    echo "✗ pre-commit: the solution does not build. Run 'dotnet build' to see the errors."
+    exit 1
+  fi
+fi
+
 # Every image referenced by the HowTo must exist.
 missing=0
 for img in $(grep -oE 'images/[A-Za-z0-9._-]+\.png' docs/HOWTO.md | sort -u); do

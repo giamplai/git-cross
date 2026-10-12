@@ -17,6 +17,7 @@ All screenshots are generated from the real application by `scripts/update-docs.
 8. [Commit details and the diff viewer](#8-commit-details-and-the-diff-viewer)
 9. [Making a commit (stage, unstage, discard, hunks, amend)](#9-making-a-commit)
 10. [Branches and tags](#10-branches-and-tags)
+10b. [Interactive rebase](#10b-interactive-rebase)
 11. [Fetch, pull and push](#11-fetch-pull-and-push)
 12. [Stashes](#12-stashes)
 13. [Rewriting and moving: cherry-pick, revert, reset](#13-cherry-pick-revert-reset)
@@ -146,6 +147,7 @@ Right-click any commit:
 | **Create tag here…** | Asks for a tag name, then creates a lightweight tag on that commit. |
 | **Cherry-pick onto current branch** | Applies that commit on top of the current branch (see [section 13](#13-cherry-pick-revert-reset)). |
 | **Revert this commit** | Creates a new commit that undoes it (merge commits are reverted against their first parent). |
+| **Interactive rebase onto this commit…** | Opens the interactive rebase dialog for the commits *after* the one you clicked ([section 10b](#10b-interactive-rebase)). |
 | **Reset current branch to here → Soft / Mixed / Hard** | Moves the branch pointer. Hard asks for confirmation. |
 | **Copy commit hash** | Copies the full 40-character hash to the clipboard. |
 
@@ -255,6 +257,34 @@ If there is nothing staged or the message is empty, the status bar says so and n
 | Check out a tag | Double-click it (detached HEAD). |
 
 If a checkout would overwrite uncommitted changes, git refuses and the message appears in red in the status bar; stash or commit first.
+
+## 10b. Interactive rebase
+
+![Interactive rebase dialog](images/interactive-rebase.png)
+
+Interactive rebase tidies up a series of local commits before you share them: reorder them, merge small fixes into the commits they belong to, rewrite messages, or remove commits entirely.
+
+1. **Pick the base.** Right-click the commit that should stay *as it is* — the commit **just before** the ones you want to edit — and choose **Interactive rebase onto this commit…**. (If there is nothing after it on the current branch, the status bar says so.)
+2. **Edit the plan.** The dialog lists the commits after the base, **oldest first — they are applied from top to bottom**. For each commit choose an action:
+
+   | Action | Result |
+   |---|---|
+   | **Pick** | Keep the commit as it is. |
+   | **Reword** | Keep the changes but use a new message. Selecting the row shows a message box, pre-filled with the current message; a message is required. |
+   | **Squash** | Merge the commit into the commit above it and combine both messages. |
+   | **Fixup** | Merge the commit into the commit above it and discard its message (ideal for "fix typo" commits). |
+   | **Drop** | Remove the commit and its changes (shown struck-through). |
+
+   Use **▲ ▼** to reorder. Squashed/fixed-up commits are shown indented under the commit they join. To choose the message of a squashed group, set the **first** commit of the group to **Reword**.
+3. **Check the hint.** If the plan can't run, a red message explains why and **Start rebase** is disabled — for example, the first commit cannot be squashed or fixed up (there is nothing above it), everything dropped, or a reword without a message.
+4. Click **Start rebase**. The history updates in place.
+
+**If a step conflicts** (typical when you reorder commits that touch the same lines) the usual yellow banner appears: resolve the files, press **Continue**, and the rebase proceeds to the next commit — a reworded message is still applied after you continue. **Abort** restores the branch exactly as it was.
+
+Good to know:
+* The working tree must be clean — commit or stash first, otherwise git refuses and the status bar shows its message.
+* Merge commits in the range are not replayed (this is how git's plain rebase works).
+* Rewriting commits that were already pushed changes their hashes: sharing the result needs a force push, and teammates must be told. Only rewrite history you have not shared.
 
 ## 11. Fetch, pull and push
 
@@ -378,7 +408,7 @@ The app asks before anything that can lose work:
 * Hard reset
 * Dropping a stash
 * Aborting a merge/cherry-pick/revert/rebase
-* Starting a rebase
+* Starting a rebase (plain or interactive)
 
 Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete unmerged branches. Untracked files are never deleted by a single click.
 
@@ -397,7 +427,7 @@ Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete u
 
 ## 21. Known limitations
 
-* Interactive rebase (reordering/squashing/editing commits in a todo list) is not available; plain rebase onto a branch is. A rebase started elsewhere is recognized and can be continued or aborted.
+* Interactive rebase supports pick, reword, squash, fixup, drop and reordering; the `edit` and `exec` todo commands, and rebasing merge commits, are not available. A rebase started elsewhere is recognized and can be continued or aborted.
 * Conflicts are resolved per file (take a side, or edit in your editor); there is no built-in three-way merge editor.
 * Staging works per file, per hunk and per selected line (unified view only; not for untracked files).
 * Diffs highlight changes but have no language syntax coloring yet. In side-by-side mode lines are paired by position, so when a block changes many lines the pairs can look offset.
