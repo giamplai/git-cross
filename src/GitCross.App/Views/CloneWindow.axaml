@@ -7,7 +7,7 @@
     <TextBlock Text="Clone a repository" FontSize="20" FontWeight="Bold" />
     <StackPanel Spacing="4">
       <TextBlock Text="Repository URL" Classes="section" />
-      <TextBox x:Name="UrlBox" Watermark="https://github.com/owner/repo.git" />
+      <TextBox x:Name="UrlBox" PlaceholderText="https://github.com/owner/repo.git" />
     </StackPanel>
     <StackPanel Spacing="4">
       <TextBlock Text="Destination folder" Classes="section" />

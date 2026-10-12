@@ -472,6 +472,16 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    public Task CherryPickAsync(string sha) => Mutate(() => _repo!.CherryPickAsync(sha), sha);
+
+    public Task RevertAsync(string sha) => Mutate(() => _repo!.RevertAsync(sha), sha);
+
+    public Task ResetToAsync(string sha, ResetMode mode) => Mutate(() => _repo!.ResetAsync(sha, mode), sha);
+
+    public Task TagAsync(string sha, string name) => Mutate(() => _repo!.CreateTagAsync(name, sha), sha);
+
+    public Task CheckoutShaAsync(string sha) => Mutate(() => _repo!.CheckoutAsync(sha), sha);
+
     [RelayCommand]
     private Task CheckoutCommitAsync()
         => SelectedItem?.Commit is { } c ? Mutate(() => _repo!.CheckoutAsync(c.Sha), c) : Task.CompletedTask;

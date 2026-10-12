@@ -112,4 +112,20 @@ public class WindowRenderTests
         await Settle();
         Assert.All(vm.Items, i => Assert.Contains("login", i.Subject + string.Join(' ', i.Labels.Select(l => l.Text)), StringComparison.OrdinalIgnoreCase));
     }
+
+    [AvaloniaFact]
+    public async Task History_actions_update_the_list()
+    {
+        var repo = MakeRepo();
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        Assert.True(await vm.OpenAsync(repo));
+        var tip = vm.Items.First(i => !i.IsWorkingDir);
+
+        await vm.TagAsync(tip.Commit!.Sha, "rc1");
+        Assert.Contains(vm.Items, i => i.Labels.Any(l => l.Text == "rc1"));
+
+        var before = vm.Items.Count;
+        await vm.ResetToAsync(vm.Items.Last().Commit!.Sha, Core.Git.ResetMode.Mixed);
+        Assert.True(vm.Items.Count(i => !i.IsWorkingDir) < before);
+    }
 }

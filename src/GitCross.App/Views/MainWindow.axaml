@@ -37,7 +37,7 @@
           </StackPanel>
         </StackPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
-          <TextBox x:Name="SearchBox" Text="{Binding SearchText}" Watermark="🔍  Search commits  (Ctrl+F)" Width="270" MinHeight="30" IsVisible="{Binding HasRepo}" />
+          <TextBox x:Name="SearchBox" Text="{Binding SearchText}" PlaceholderText="🔍  Search commits  (Ctrl+F)" Width="270" MinHeight="30" IsVisible="{Binding HasRepo}" />
           <Button Classes="tool" Content="{Binding ThemeLabel}" Command="{Binding CycleThemeCommand}" ToolTip.Tip="Switch theme" />
         </StackPanel>
       </DockPanel>
@@ -132,7 +132,23 @@
                     <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" Classes="history">
                       <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:HistoryItem">
-                          <Grid ColumnDefinitions="Auto,*,150,96,64" Height="28" ToolTip.Tip="{Binding FullDate}">
+                          <Grid ColumnDefinitions="Auto,*,150,96,64" Height="28" ToolTip.Tip="{Binding FullDate}" Background="Transparent">
+                            <Grid.ContextMenu>
+                              <ContextMenu>
+                                <MenuItem Header="Checkout this commit" Click="OnCommitCheckout" />
+                                <MenuItem Header="Create tag here…" Click="OnCommitTag" />
+                                <Separator />
+                                <MenuItem Header="Cherry-pick onto current branch" Click="OnCommitCherryPick" />
+                                <MenuItem Header="Revert this commit" Click="OnCommitRevert" />
+                                <MenuItem Header="Reset current branch to here">
+                                  <MenuItem Header="Soft (keep index and files)" Click="OnResetSoft" />
+                                  <MenuItem Header="Mixed (keep files)" Click="OnResetMixed" />
+                                  <MenuItem Header="Hard (discard all changes)" Click="OnResetHard" />
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="Copy commit hash" Click="OnCommitCopy" />
+                              </ContextMenu>
+                            </Grid.ContextMenu>
                             <c:GraphCell Row="{Binding Row}" Width="{Binding GraphWidth}" IsVisible="{Binding !IsWorkingDir}" />
                             <TextBlock Text="●" IsVisible="{Binding IsWorkingDir}" Width="{Binding GraphWidth}" TextAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}" />
                             <StackPanel Grid.Column="1" Orientation="Horizontal" ClipToBounds="True">
@@ -162,7 +178,7 @@
                   <GridSplitter Grid.Column="1" />
                   <Grid Grid.Column="2" RowDefinitions="Auto,Auto,*" Margin="10">
                     <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,8">
-                      <TextBox Text="{Binding NewBranchName}" Watermark="new branch name" Width="150" MinHeight="28" />
+                      <TextBox Text="{Binding NewBranchName}" PlaceholderText="new branch name" Width="150" MinHeight="28" />
                       <Button Classes="mini" Content="Branch here" Command="{Binding CreateBranchCommand}" />
                       <Button Classes="mini" Content="Checkout" Command="{Binding CheckoutCommitCommand}" />
                     </StackPanel>
@@ -230,7 +246,7 @@
                       <TextBlock Text="{Binding SummaryLength, StringFormat='{}{0}/72'}" Classes="muted" VerticalAlignment="Center" FontSize="12" />
                     </StackPanel>
                     <TextBlock DockPanel.Dock="Top" Text="Commit message" FontWeight="SemiBold" Margin="0,0,0,6" />
-                    <TextBox Text="{Binding CommitMessage}" AcceptsReturn="True" TextWrapping="Wrap" Watermark="Summary on the first line, details below…">
+                    <TextBox Text="{Binding CommitMessage}" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="Summary on the first line, details below…">
                       <TextBox.KeyBindings>
                         <KeyBinding Gesture="Ctrl+Enter" Command="{Binding CommitCommand}" />
                       </TextBox.KeyBindings>

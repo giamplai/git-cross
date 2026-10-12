@@ -1,8 +1,10 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using GitCross.App.ViewModels;
+using GitCross.Core.Git;
 
 namespace GitCross.App.Views;
 
@@ -93,6 +95,68 @@ public partial class MainWindow : Window
     private void OnSidebarMerge(object? sender, RoutedEventArgs e) => _vm.MergeRefCommand.Execute(RefOf(sender));
 
     private void OnSidebarDelete(object? sender, RoutedEventArgs e) => _vm.DeleteBranchCommand.Execute(RefOf(sender));
+
+    private static HistoryItem? ItemOf(object? sender)
+        => (sender as Control)?.DataContext is HistoryItem { IsWorkingDir: false, Commit: not null } i ? i : null;
+
+    private async void OnCommitCheckout(object? s, RoutedEventArgs e)
+    {
+        if (ItemOf(s) is { } i) { await _vm.CheckoutShaAsync(i.Commit!.Sha); }
+    }
+
+    private async void OnCommitCherryPick(object? s, RoutedEventArgs e)
+    {
+        if (ItemOf(s) is { } i) { await _vm.CherryPickAsync(i.Commit!.Sha); }
+    }
+
+    private async void OnCommitRevert(object? s, RoutedEventArgs e)
+    {
+        if (ItemOf(s) is { } i) { await _vm.RevertAsync(i.Commit!.Sha); }
+    }
+
+    private async void OnCommitTag(object? s, RoutedEventArgs e)
+    {
+        if (ItemOf(s) is not { } i)
+        {
+            return;
+        }
+
+        var name = await PromptWindow.AskAsync(this, "Create tag", $"Tag commit {i.ShortSha}", "Create tag", true, "tag name, e.g. v1.2.0");
+        if (name is { Length: > 0 })
+        {
+            await _vm.TagAsync(i.Commit!.Sha, name);
+        }
+    }
+
+    private async void OnCommitCopy(object? s, RoutedEventArgs e)
+    {
+        if (ItemOf(s) is { } i && TopLevel.GetTopLevel(this)?.Clipboard is { } cb)
+        {
+            await cb.SetTextAsync(i.Commit!.Sha);
+        }
+    }
+
+    private void OnResetSoft(object? s, RoutedEventArgs e) => _ = Reset(s, ResetMode.Soft);
+
+    private void OnResetMixed(object? s, RoutedEventArgs e) => _ = Reset(s, ResetMode.Mixed);
+
+    private void OnResetHard(object? s, RoutedEventArgs e) => _ = Reset(s, ResetMode.Hard);
+
+    private async Task Reset(object? sender, ResetMode mode)
+    {
+        if (ItemOf(sender) is not { } i)
+        {
+            return;
+        }
+
+        if (mode == ResetMode.Hard
+            && await PromptWindow.AskAsync(this, "Hard reset", $"Move the current branch to {i.ShortSha} and DISCARD all uncommitted changes? This cannot be undone.", "Hard reset") is null)
+        {
+            return;
+        }
+
+        await _vm.ResetToAsync(i.Commit!.Sha, mode);
+    }
 
     private sealed class FocusSearchCommand(Control target) : System.Windows.Input.ICommand
     {

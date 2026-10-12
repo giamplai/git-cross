@@ -15,7 +15,9 @@
 | Themes (system/light/dark) | Done | persisted |
 | Settings dialog | Todo | |
 | Clone / init | Done | clone dialog, init via folder picker |
-| Merge/rebase/cherry-pick/revert/reset | Todo | |
+| Cherry-pick / revert / reset / tag (commit context menu) | Done | hard reset asks for confirmation |
+| Merge (from sidebar) | Done | no merge dialog/options |
+| Rebase | Todo | |
 | Conflict resolution | Todo | |
 | Blame / file history | Todo | |
 | Submodules | Todo | |
