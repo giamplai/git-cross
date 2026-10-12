@@ -1,6 +1,7 @@
 using GitCross.Core.Blame;
 using GitCross.Core.Diff;
 using GitCross.Core.Models;
+using GitCross.Core.Rebase;
 
 namespace GitCross.Core.Git;
 
@@ -153,6 +154,42 @@ public sealed class GitRepository
         });
 
     /// <summary>Replays the current branch's commits on top of <paramref name="onto"/>. Conflicts leave a Rebase operation in progress.</summary>
+    /// <summary>Commits that an interactive rebase onto <paramref name="onto"/> would replay, oldest first (merge commits are not replayed by rebase).</summary>
+    public async Task<IReadOnlyList<Commit>> GetRebaseCandidatesAsync(string onto)
+    {
+        var r = await _git.RunAsync(["log", "--reverse", "--no-merges", $"--format={Parsers.LogFormat}", $"{onto}..HEAD"], null, default);
+        return r.Success ? Parsers.ParseLog(r.StdOut).ToList() : [];
+    }
+
+    /// <summary>Runs <c>git rebase -i</c> with a todo list built by the app (no editor involved). Conflicts leave a Rebase operation in progress.</summary>
+    public async Task InteractiveRebaseAsync(string onto, IReadOnlyList<RebaseTodoItem> todo)
+    {
+        if (InteractiveRebasePlanner.Validate(todo) is { } problem)
+        {
+            throw new InvalidOperationException(problem);
+        }
+
+        var dir = Path.Combine(Path.GetTempPath(), "gxc-rebase-" + Guid.NewGuid().ToString("N")[..10]);
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var todoFile = Path.Combine(dir, "todo.txt");
+            File.WriteAllText(todoFile, InteractiveRebasePlanner.BuildTodo(todo, dir));
+            // git appends the real todo path; our "editor" simply overwrites it with the prepared list.
+            var editor = "cp " + InteractiveRebasePlanner.ShellQuote(todoFile);
+            var env = new Dictionary<string, string> { ["GIT_SEQUENCE_EDITOR"] = editor };
+            (await _git.RunAsync(["rebase", "-i", onto], null, default, env)).OrThrow("rebase -i " + onto);
+        }
+        finally
+        {
+            // After a conflict the exec lines still need their message files, so keep them until the operation ends.
+            if (await GetOperationAsync() != GitOperation.Rebase)
+            {
+                try { Directory.Delete(dir, true); } catch (IOException) { }
+            }
+        }
+    }
+
     public Task RebaseAsync(string onto) => _git.OutAsync("rebase", onto);
 
     public Task FetchAsync() => _git.OutAsync("fetch", "--all", "--prune");

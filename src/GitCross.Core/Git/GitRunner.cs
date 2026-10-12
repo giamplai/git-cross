@@ -25,7 +25,7 @@ public sealed class GitRunner(string workingDirectory, string? gitExecutable = n
 
     public string WorkingDirectory { get; } = workingDirectory;
 
-    public async Task<GitResult> RunAsync(IEnumerable<string> args, string? stdin = null, CancellationToken ct = default)
+    public async Task<GitResult> RunAsync(IEnumerable<string> args, string? stdin = null, CancellationToken ct = default, IReadOnlyDictionary<string, string>? env = null)
     {
         var psi = new ProcessStartInfo(gitExecutable ?? Executable)
         {
@@ -51,6 +51,13 @@ public sealed class GitRunner(string workingDirectory, string? gitExecutable = n
         // --continue and merges must never open an editor we cannot show.
         psi.Environment["GIT_EDITOR"] = "true";
         psi.Environment["GIT_MERGE_AUTOEDIT"] = "no";
+        if (env is not null)
+        {
+            foreach (var (k, v) in env)
+            {
+                psi.Environment[k] = v;
+            }
+        }
 
         using var p = Process.Start(psi) ?? throw new InvalidOperationException("Cannot start git");
         if (stdin is not null)
