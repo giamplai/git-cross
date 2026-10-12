@@ -1,3 +1,4 @@
+using GitCross.Core.Diff;
 using GitCross.Core.Models;
 
 namespace GitCross.Core.Git;
@@ -133,6 +134,30 @@ public sealed class GitRepository
         => _git.OutAsync(message is null ? ["stash", "push", "-u"] : ["stash", "push", "-u", "-m", message]);
 
     public Task StashPopAsync() => _git.OutAsync("stash", "pop");
+
+    /// <summary>Applies a patch from memory. <paramref name="toIndex"/> targets the index (staging), otherwise the work tree.</summary>
+    public async Task ApplyPatchAsync(string patch, bool toIndex, bool reverse)
+    {
+        List<string> a = ["apply", "--whitespace=nowarn", "--recount"];
+        if (toIndex) { a.Add("--cached"); }
+        if (reverse) { a.Add("--reverse"); }
+        (await _git.RunAsync(a, patch, default)).OrThrow(string.Join(' ', a));
+    }
+
+    /// <summary>Stage (or, with <paramref name="unstage"/>, unstage) one hunk of a tracked file.</summary>
+    public async Task StageHunkAsync(string path, int hunkIndex, bool unstage)
+    {
+        var diff = await GetWorkingDiffAsync(path, staged: unstage);
+        var patch = PatchBuilder.BuildHunkPatch(diff, hunkIndex) ?? throw new InvalidOperationException("Hunk no longer exists; refresh and retry.");
+        await ApplyPatchAsync(patch, toIndex: true, reverse: unstage);
+    }
+
+    public async Task DiscardHunkAsync(string path, int hunkIndex)
+    {
+        var diff = await GetWorkingDiffAsync(path, staged: false);
+        var patch = PatchBuilder.BuildHunkPatch(diff, hunkIndex) ?? throw new InvalidOperationException("Hunk no longer exists; refresh and retry.");
+        await ApplyPatchAsync(patch, toIndex: false, reverse: true);
+    }
 
     public Task CherryPickAsync(string sha) => _git.OutAsync("cherry-pick", sha);
 
