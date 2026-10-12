@@ -8,7 +8,7 @@ public sealed record GitResult(int ExitCode, string StdOut, string StdErr)
     public bool Success => ExitCode == 0;
 
     public string OrThrow(string command)
-        => Success ? StdOut : throw new GitException(command, ExitCode, StdErr);
+        => Success ? StdOut : throw new GitException(command, ExitCode, StdErr.Trim().Length > 0 ? StdErr : StdOut);
 }
 
 public sealed class GitException(string command, int exitCode, string stdErr)
@@ -45,6 +45,9 @@ public sealed class GitRunner(string workingDirectory, string gitExecutable = "g
         // Never block on an interactive prompt we cannot answer.
         psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
         psi.Environment["LC_ALL"] = "C";
+        // --continue and merges must never open an editor we cannot show.
+        psi.Environment["GIT_EDITOR"] = "true";
+        psi.Environment["GIT_MERGE_AUTOEDIT"] = "no";
 
         using var p = Process.Start(psi) ?? throw new InvalidOperationException("Cannot start git");
         if (stdin is not null)

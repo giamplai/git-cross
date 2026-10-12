@@ -17,7 +17,10 @@ public sealed record Commit(
 
 public enum ChangeKind { Added, Modified, Deleted, Renamed, Copied, Untracked, Conflicted, TypeChanged }
 
-public sealed record FileChange(string Path, ChangeKind Kind, string? OldPath = null);
+public sealed record FileChange(string Path, ChangeKind Kind, string? OldPath = null)
+{
+    public bool IsConflicted => Kind == ChangeKind.Conflicted;
+}
 
 public sealed record WorkingStatus(
     string? Branch,
@@ -31,3 +34,6 @@ public sealed record StashEntry(int Index, string Message, string Sha)
 {
     public string Ref => $"stash@{{{Index}}}";
 }
+
+/// <summary>A multi-step git operation that may be paused waiting for the user (conflicts).</summary>
+public enum GitOperation { None, Merge, CherryPick, Revert, Rebase }

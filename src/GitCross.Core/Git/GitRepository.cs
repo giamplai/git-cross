@@ -190,6 +190,46 @@ public sealed class GitRepository
         await ApplyPatchAsync(patch, toIndex: false, reverse: true);
     }
 
+    /// <summary>Which paused operation (if any) is in progress, detected from the files git leaves in its directory.</summary>
+    public async Task<GitOperation> GetOperationAsync()
+    {
+        var dir = (await _git.OutAsync("rev-parse", "--absolute-git-dir")).Trim();
+        bool F(string n) => File.Exists(Path.Combine(dir, n));
+        bool D(string n) => Directory.Exists(Path.Combine(dir, n));
+        if (D("rebase-merge") || D("rebase-apply")) { return GitOperation.Rebase; }
+        if (F("MERGE_HEAD")) { return GitOperation.Merge; }
+        if (F("CHERRY_PICK_HEAD")) { return GitOperation.CherryPick; }
+        if (F("REVERT_HEAD")) { return GitOperation.Revert; }
+        return GitOperation.None;
+    }
+
+    public Task ContinueAsync(GitOperation op) => op switch
+    {
+        GitOperation.Merge => _git.OutAsync("commit", "--no-edit"),
+        GitOperation.CherryPick => _git.OutAsync("cherry-pick", "--continue"),
+        GitOperation.Revert => _git.OutAsync("revert", "--continue"),
+        GitOperation.Rebase => _git.OutAsync("rebase", "--continue"),
+        _ => Task.CompletedTask,
+    };
+
+    public Task AbortAsync(GitOperation op) => op switch
+    {
+        GitOperation.Merge => _git.OutAsync("merge", "--abort"),
+        GitOperation.CherryPick => _git.OutAsync("cherry-pick", "--abort"),
+        GitOperation.Revert => _git.OutAsync("revert", "--abort"),
+        GitOperation.Rebase => _git.OutAsync("rebase", "--abort"),
+        _ => Task.CompletedTask,
+    };
+
+    /// <summary>Resolve a conflicted file by taking one side wholesale ("ours" = current branch) and staging it.</summary>
+    public async Task ResolveAsync(string path, bool takeOurs)
+    {
+        await _git.OutAsync("checkout", takeOurs ? "--ours" : "--theirs", "--", path);
+        await _git.OutAsync("add", "--", path);
+    }
+
+    public string ResolvePath(string relative) => Path.Combine(Root, relative.Replace('/', Path.DirectorySeparatorChar));
+
     public Task CherryPickAsync(string sha) => _git.OutAsync("cherry-pick", sha);
 
     /// <summary>Reverts a commit; merge commits are reverted against their first parent.</summary>
@@ -202,7 +242,6 @@ public sealed class GitRepository
     public Task ResetAsync(string sha, ResetMode mode)
         => _git.OutAsync("reset", mode switch { ResetMode.Soft => "--soft", ResetMode.Hard => "--hard", _ => "--mixed" }, sha);
 
-    public Task AbortAsync(string operation) => _git.OutAsync(operation, "--abort"); // merge | cherry-pick | revert | rebase
 }
 
 public enum ResetMode { Soft, Mixed, Hard }
