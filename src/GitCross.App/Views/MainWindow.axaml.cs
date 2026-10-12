@@ -159,6 +159,28 @@ public partial class MainWindow : Window
         await _vm.ResetToAsync(i.Commit!.Sha, mode);
     }
 
+    private static Core.Models.StashEntry? StashOf(object? sender)
+        => (sender as Control)?.DataContext is SidebarEntry { Stash: { } st } ? st : null;
+
+    private async void OnStashApply(object? s, RoutedEventArgs e)
+    {
+        if (StashOf(s) is { } st) { await _vm.StashApplyAsync(st); }
+    }
+
+    private async void OnStashPop(object? s, RoutedEventArgs e)
+    {
+        if (StashOf(s) is { } st) { await _vm.StashPopEntryAsync(st); }
+    }
+
+    private async void OnStashDrop(object? s, RoutedEventArgs e)
+    {
+        if (StashOf(s) is { } st
+            && await PromptWindow.AskAsync(this, "Drop stash", $"Permanently delete {st.Ref} ({st.Message})?", "Drop") is not null)
+        {
+            await _vm.StashDropAsync(st);
+        }
+    }
+
     private sealed class FocusSearchCommand(Control target) : System.Windows.Input.ICommand
     {
         public event EventHandler? CanExecuteChanged { add { } remove { } }

@@ -21,9 +21,11 @@ public sealed class HistoryItem
     public double GraphWidth { get; init; }
 }
 
-public sealed record SidebarEntry(string Text, GitRef? Ref = null, bool IsHeader = false, string Count = "")
+public sealed record SidebarEntry(string Text, GitRef? Ref = null, bool IsHeader = false, string Count = "", StashEntry? Stash = null)
 {
     public bool IsItem => !IsHeader;
+    public bool IsRefItem => Ref is not null;
+    public bool IsStash => Stash is not null;
 }
 
 public sealed record RecentRepo(string Name, string Path);

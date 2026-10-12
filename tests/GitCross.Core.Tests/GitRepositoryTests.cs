@@ -137,6 +137,22 @@ public class StashTests
     }
 
     [Fact]
+    public async Task Stash_files_are_listed_once_even_with_untracked_parent()
+    {
+        var (t, r) = await TempRepo.CreateAsync();
+        using (t)
+        {
+            t.Write("a.txt", "1"); await r.StageAsync(["a.txt"]); await r.CommitAsync("c1");
+            t.Write("a.txt", "2");
+            t.Write("u.txt", "untracked");
+            await r.StashPushAsync(); // -u => stash commit has an untracked-files parent
+            var files = await r.GetCommitFilesAsync((await r.GetStashesAsync())[0].Sha);
+            Assert.Equal(["a.txt"], files.Select(f => f.Path));
+            Assert.Contains("+2", await r.GetCommitDiffAsync((await r.GetStashesAsync())[0].Sha, "a.txt"));
+        }
+    }
+
+    [Fact]
     public async Task Stash_list_apply_drop_and_log_excludes_stash_commits()
     {
         var (t, r) = await TempRepo.CreateAsync();

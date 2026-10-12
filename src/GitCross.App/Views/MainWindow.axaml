@@ -99,9 +99,12 @@
                   <StackPanel IsVisible="{Binding IsItem}" Orientation="Horizontal" Spacing="8" Background="Transparent">
                     <StackPanel.ContextMenu>
                       <ContextMenu>
-                        <MenuItem Header="Checkout" Click="OnSidebarCheckout" />
-                        <MenuItem Header="Merge into current branch" Click="OnSidebarMerge" />
-                        <MenuItem Header="Delete branch" Click="OnSidebarDelete" />
+                        <MenuItem Header="Checkout" Click="OnSidebarCheckout" IsVisible="{Binding IsRefItem}" />
+                        <MenuItem Header="Merge into current branch" Click="OnSidebarMerge" IsVisible="{Binding IsRefItem}" />
+                        <MenuItem Header="Delete branch" Click="OnSidebarDelete" IsVisible="{Binding IsRefItem}" />
+                        <MenuItem Header="Apply stash (keep)" Click="OnStashApply" IsVisible="{Binding IsStash}" />
+                        <MenuItem Header="Pop stash (apply and drop)" Click="OnStashPop" IsVisible="{Binding IsStash}" />
+                        <MenuItem Header="Drop stash" Click="OnStashDrop" IsVisible="{Binding IsStash}" />
                       </ContextMenu>
                     </StackPanel.ContextMenu>
                     <TextBlock Text="{Binding ., Converter={x:Static c:Converters.SidebarGlyph}}" Width="14" Classes="muted" VerticalAlignment="Center" />

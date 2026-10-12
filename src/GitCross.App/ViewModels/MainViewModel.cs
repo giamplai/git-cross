@@ -22,6 +22,8 @@ public partial class MainViewModel : ObservableObject
     private GitRepository? _repo;
     private List<HistoryItem> _allItems = [];
     private IReadOnlyList<GitRef> _refs = [];
+    private IReadOnlyList<StashEntry> _stashes = [];
+    private string? _detailSha; // commit or stash whose files are listed
     private int _busy;
     private DiffSource _diffSource;
     private string? _diffPath;
@@ -188,8 +190,10 @@ public partial class MainViewModel : ObservableObject
             var commitsTask = repo.GetLogAsync();
             var refsTask = repo.GetRefsAsync();
             var statusTask = repo.GetStatusAsync();
-            await Task.WhenAll(commitsTask, refsTask, statusTask);
+            var stashTask = repo.GetStashesAsync();
+            await Task.WhenAll(commitsTask, refsTask, statusTask, stashTask);
             var (commits, refs, status) = (commitsTask.Result, refsTask.Result, statusTask.Result);
+            _stashes = stashTask.Result;
             _refs = refs;
 
             Replace(Unstaged, status.Unstaged);
@@ -269,6 +273,15 @@ public partial class MainViewModel : ObservableObject
         Group("BRANCHES", RefKind.LocalBranch);
         Group("REMOTES", RefKind.RemoteBranch);
         Group("TAGS", RefKind.Tag);
+
+        if (_stashes.Count > 0)
+        {
+            Sidebar.Add(new SidebarEntry("STASHES", IsHeader: true, Count: _stashes.Count.ToString()));
+            foreach (var st in _stashes)
+            {
+                Sidebar.Add(new SidebarEntry(st.Message, Stash: st));
+            }
+        }
     }
 
     partial void OnSearchTextChanged(string value) => ApplyFilter(SelectedItem?.Commit?.Sha);
@@ -299,6 +312,13 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnSelectedSidebarChanged(SidebarEntry? value)
     {
+        if (value?.Stash is { } stash)
+        {
+            SelectedItem = null;
+            _ = LoadDetailsAsync(stash.Sha, $"{stash.Ref}  ·  {stash.Message}");
+            return;
+        }
+
         if (value?.Ref is { } r && Items.FirstOrDefault(i => i.Commit?.Sha == r.Sha) is { } item)
         {
             SelectedItem = item;
@@ -336,24 +356,36 @@ public partial class MainViewModel : ObservableObject
 
     private async Task LoadCommitAsync(HistoryItem item)
     {
-        if (_repo is not { } repo || item.Commit is not { } c)
+        if (item.Commit is not { } c)
+        {
+            return;
+        }
+
+        await LoadDetailsAsync(c.Sha, $"{c.Sha}\n{c.AuthorName} <{c.AuthorEmail}> · {c.AuthorDate:f}");
+    }
+
+    /// <summary>Loads message + changed files of a commit or stash into the details pane.</summary>
+    private async Task LoadDetailsAsync(string sha, string header)
+    {
+        if (_repo is not { } repo)
         {
             return;
         }
 
         ClearDetails();
         var v = _version;
+        _detailSha = sha;
         await Guard(async () =>
         {
-            var msgTask = repo.GetCommitMessageAsync(c.Sha);
-            var filesTask = repo.GetCommitFilesAsync(c.Sha);
+            var msgTask = repo.GetCommitMessageAsync(sha);
+            var filesTask = repo.GetCommitFilesAsync(sha);
             await Task.WhenAll(msgTask, filesTask);
             if (v != _version)
             {
                 return;
             }
 
-            CommitInfo = $"{c.Sha}\n{c.AuthorName} <{c.AuthorEmail}> · {c.AuthorDate:f}\n\n{msgTask.Result}";
+            CommitInfo = $"{header}\n\n{msgTask.Result}";
             Replace(CommitFiles, filesTask.Result);
             if (CommitFiles.Count > 0)
             {
@@ -364,9 +396,9 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnSelectedCommitFileChanged(FileChange? value)
     {
-        if (value is not null && SelectedItem?.Commit is { } c)
+        if (value is not null && _detailSha is { } sha)
         {
-            _ = ShowDiffAsync(DiffSource.Commit, value.Path, () => _repo!.GetCommitDiffAsync(c.Sha, value.Path));
+            _ = ShowDiffAsync(DiffSource.Commit, value.Path, () => _repo!.GetCommitDiffAsync(sha, value.Path));
         }
     }
 
@@ -536,6 +568,12 @@ public partial class MainViewModel : ObservableObject
             NewBranchName = "";
         }
     }
+
+    public Task StashApplyAsync(StashEntry s) => Mutate(() => _repo!.StashApplyAsync(s), s);
+
+    public Task StashPopEntryAsync(StashEntry s) => Mutate(() => _repo!.StashPopAsync(s), s);
+
+    public Task StashDropAsync(StashEntry s) => Mutate(() => _repo!.StashDropAsync(s), s);
 
     public Task CherryPickAsync(string sha) => Mutate(() => _repo!.CherryPickAsync(sha), sha);
 

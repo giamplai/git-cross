@@ -77,14 +77,21 @@ public sealed class GitRepository
     public async Task<WorkingStatus> GetStatusAsync()
         => Parsers.ParseStatus(await _git.OutAsync("status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all"));
 
+    /// <summary>Files changed by a commit relative to its first parent (root commits: relative to the empty tree).</summary>
     public async Task<IReadOnlyList<FileChange>> GetCommitFilesAsync(string sha)
-        => Parsers.ParseNameStatus(await _git.OutAsync("diff-tree", "--no-commit-id", "--name-status", "-r", "-z", "-m", "--first-parent", "--root", sha)).ToList();
+        => Parsers.ParseNameStatus(await _git.OutAsync(await HasParentAsync(sha)
+            ? ["diff", "--name-status", "-z", "--find-renames", sha + "^1", sha]
+            : ["diff-tree", "--no-commit-id", "--name-status", "-r", "-z", "--root", sha])).ToList();
+
+    private async Task<bool> HasParentAsync(string sha) => (await _git.RunAsync("rev-parse", "--verify", "--quiet", sha + "^1")).Success;
 
     public async Task<string> GetCommitMessageAsync(string sha)
         => (await _git.OutAsync("show", "-s", "--format=%B", sha)).TrimEnd();
 
-    public Task<string> GetCommitDiffAsync(string sha, string path)
-        => _git.OutAsync("show", "--format=", "--first-parent", "-m", sha, "--", path);
+    public async Task<string> GetCommitDiffAsync(string sha, string path)
+        => await HasParentAsync(sha)
+            ? await _git.OutAsync("diff", "--find-renames", sha + "^1", sha, "--", path)
+            : await _git.OutAsync("show", "--format=", sha, "--", path);
 
     public async Task<string> GetWorkingDiffAsync(string path, bool staged, bool untracked = false)
     {

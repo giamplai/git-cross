@@ -77,7 +77,7 @@ public static class Converters
     public static readonly IValueConverter AvatarBrush = new Func<string, IBrush>(
         name => AvatarPalette[(name.Aggregate(17, (h, c) => unchecked(h * 31 + c)) & 0x7fffffff) % AvatarPalette.Length]).AsConverter();
 
-    public static readonly IValueConverter SidebarGlyph = new Func<SidebarEntry, string>(e => e.Ref switch
+    public static readonly IValueConverter SidebarGlyph = new Func<SidebarEntry, string>(e => e.Stash is not null ? "📦" : e.Ref switch
     {
         { IsCurrent: true } => "●",
         { Kind: RefKind.Tag } => "🏷",

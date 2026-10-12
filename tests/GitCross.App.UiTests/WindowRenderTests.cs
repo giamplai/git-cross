@@ -156,6 +156,28 @@ public class WindowRenderTests
         Assert.Equal(1, vm.Diff.Count(l => l.IsHunk)); // diff reloaded with the remaining hunk
     }
 
+    [AvaloniaFact]
+    public async Task Stash_appears_in_sidebar_with_files_and_can_be_dropped()
+    {
+        var repo = MakeRepo();
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        var w = new MainWindow(vm);
+        w.Show();
+        await vm.OpenAsync(repo);
+        vm.StashCommand.Execute(null);
+        await Settle();
+
+        var entry = vm.Sidebar.Single(e => e.IsStash);
+        Assert.DoesNotContain(vm.Items, i => i.IsWorkingDir); // working tree is clean now
+        vm.SelectedSidebar = entry;
+        await Settle();
+        Assert.Contains(vm.CommitFiles, f => f.Path == "a.txt");
+        Shot(w, "07-stash.png");
+
+        await vm.StashDropAsync(entry.Stash!);
+        Assert.DoesNotContain(vm.Sidebar, e => e.IsStash);
+    }
+
     private static void Git(string dir, string args)
     {
         var psi = new ProcessStartInfo("git", args) { WorkingDirectory = dir, RedirectStandardError = true, RedirectStandardOutput = true };
