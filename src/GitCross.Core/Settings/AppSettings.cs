@@ -13,6 +13,17 @@ public sealed class AppSettings
 
     public string? LastCloneDirectory { get; set; }
 
+    /// <summary>Full path of the git executable; null/empty = use "git" from PATH.</summary>
+    public string? GitExecutable { get; set; }
+
+    /// <summary>When true the toolbar Pull button rebases instead of merging.</summary>
+    public bool PullRebase { get; set; }
+
+    /// <summary>How many commits the history loads.</summary>
+    public int MaxCommits { get; set; } = 2000;
+
+    public static readonly int[] MaxCommitsChoices = [500, 1000, 2000, 5000, 10000];
+
     public void AddRecent(string path)
     {
         RecentRepositories.RemoveAll(p => string.Equals(p, path, StringComparison.Ordinal));

@@ -18,13 +18,16 @@ public sealed class GitException(string command, int exitCode, string stdErr)
 }
 
 /// <summary>Runs the git executable. Works the same on Windows, Linux and macOS.</summary>
-public sealed class GitRunner(string workingDirectory, string gitExecutable = "git")
+public sealed class GitRunner(string workingDirectory, string? gitExecutable = null)
 {
+    /// <summary>Executable used when none is given (set from the user's settings; plain "git" resolves via PATH).</summary>
+    public static string Executable { get; set; } = "git";
+
     public string WorkingDirectory { get; } = workingDirectory;
 
     public async Task<GitResult> RunAsync(IEnumerable<string> args, string? stdin = null, CancellationToken ct = default)
     {
-        var psi = new ProcessStartInfo(gitExecutable)
+        var psi = new ProcessStartInfo(gitExecutable ?? Executable)
         {
             WorkingDirectory = WorkingDirectory,
             RedirectStandardOutput = true,
