@@ -19,7 +19,7 @@
 | Merge (from sidebar) | Done | no merge dialog/options |
 | Rebase | Todo | |
 | Conflict resolution | Todo | |
-| Blame / file history | Todo | |
+| Blame / file history | Done | right-click a file: blame (at commit or work tree), file history with renames; double-click blame line jumps to commit |
 | Submodules | Todo | |
 | Interactive rebase | Todo | |
 | Search/filter commits | Todo | |

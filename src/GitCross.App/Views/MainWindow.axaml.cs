@@ -181,6 +181,31 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string? PathOf(object? sender) => (sender as Control)?.DataContext is Core.Models.FileChange f ? f.Path : null;
+
+    private async void OnBlameCommitFile(object? s, RoutedEventArgs e)
+    {
+        if (PathOf(s) is { } p) { await _vm.ShowBlameAsync(p, _vm.DetailSha); }
+    }
+
+    private async void OnBlameWorkFile(object? s, RoutedEventArgs e)
+    {
+        if (PathOf(s) is { } p) { await _vm.ShowBlameAsync(p, null); }
+    }
+
+    private async void OnFileHistory(object? s, RoutedEventArgs e)
+    {
+        if (PathOf(s) is { } p) { await _vm.ShowFileHistoryAsync(p); }
+    }
+
+    private async void OnBlameDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if ((sender as ListBox)?.SelectedItem is BlameRow row)
+        {
+            await _vm.ShowCommitAsync(row.Line.Sha);
+        }
+    }
+
     private sealed class FocusSearchCommand(Control target) : System.Windows.Input.ICommand
     {
         public event EventHandler? CanExecuteChanged { add { } remove { } }

@@ -29,3 +29,11 @@ public sealed record SidebarEntry(string Text, GitRef? Ref = null, bool IsHeader
 }
 
 public sealed record RecentRepo(string Name, string Path);
+
+/// <summary>A blame line plus presentation hints: metadata is shown only on the first line of a run from one commit.</summary>
+public sealed record BlameRow(GitCross.Core.Blame.BlameLine Line, bool ShowMeta, bool Stripe, string When)
+{
+    public string Author => ShowMeta ? Line.Author : "";
+    public string Sha => ShowMeta ? Line.ShortSha : "";
+    public string Date => ShowMeta ? When : "";
+}

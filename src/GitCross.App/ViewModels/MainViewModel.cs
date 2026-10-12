@@ -23,6 +23,7 @@ public partial class MainViewModel : ObservableObject
     private List<HistoryItem> _allItems = [];
     private IReadOnlyList<GitRef> _refs = [];
     private IReadOnlyList<StashEntry> _stashes = [];
+    private string? _fileFilter; // when set, history lists only commits touching this file
     private string? _detailSha; // commit or stash whose files are listed
     private int _busy;
     private DiffSource _diffSource;
@@ -58,12 +59,17 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _newBranchName = "";
     [ObservableProperty] private string _diffTitle = "";
     [ObservableProperty] private double _graphWidth = 40;
+    [ObservableProperty] private string _blameTitle = "";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasFileFilter)), NotifyPropertyChangedFor(nameof(FileFilterText))] private string? _fileFilterPath;
     [ObservableProperty] private ThemeVariant _themeVariant = ThemeVariant.Default;
 
     public bool HasRepo => RepoName is not null;
     public string UnstagedHeader => $"Unstaged changes ({Unstaged.Count})";
     public string StagedHeader => $"Staged changes ({Staged.Count})";
     public int SummaryLength => CommitMessage.Split('\n')[0].Length;
+    public double HeaderGraphWidth => _fileFilter is null && SearchText.Trim().Length == 0 ? GraphWidth : 0;
+    public bool HasFileFilter => FileFilterPath is not null;
+    public string FileFilterText => $"History of {FileFilterPath}";
     public bool HasDiff => Diff.Count > 0;
     public bool HunkActionsEnabled => _diffSource is DiffSource.Unstaged or DiffSource.Staged;
     public bool CanDiscardHunk => _diffSource == DiffSource.Unstaged;
@@ -71,6 +77,7 @@ public partial class MainViewModel : ObservableObject
     public string ThemeLabel => _settings.Theme switch { "Light" => "☀ Light", "Dark" => "🌙 Dark", _ => "◐ System" };
 
     public ObservableCollection<HistoryItem> Items { get; } = [];
+    public ObservableCollection<BlameRow> BlameRows { get; } = [];
     public ObservableCollection<SidebarEntry> Sidebar { get; } = [];
     public ObservableCollection<FileChange> CommitFiles { get; } = [];
     public ObservableCollection<FileChange> Unstaged { get; } = [];
@@ -164,6 +171,68 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    public async Task ShowFileHistoryAsync(string path)
+    {
+        _fileFilter = path;
+        FileFilterPath = path;
+        SelectedTab = 0;
+        await RefreshAsync();
+    }
+
+    [RelayCommand]
+    private async Task ClearFileHistoryAsync()
+    {
+        _fileFilter = null;
+        FileFilterPath = null;
+        await RefreshAsync();
+    }
+
+    /// <summary>Opens the Blame tab for a file at a revision (null = work tree).</summary>
+    public async Task ShowBlameAsync(string path, string? rev)
+    {
+        if (_repo is not { } repo)
+        {
+            return;
+        }
+
+        await Guard(async () =>
+        {
+            var lines = await repo.GetBlameAsync(path, rev);
+            var now = DateTimeOffset.Now;
+            BlameRows.Clear();
+            string? last = null;
+            var stripe = false;
+            foreach (var l in lines)
+            {
+                var first = l.Sha != last;
+                if (first) { stripe = !stripe; last = l.Sha; }
+                BlameRows.Add(new BlameRow(l, first, stripe, RelativeTime.Format(l.Date, now)));
+            }
+
+            BlameTitle = rev is null ? path : $"{path} @ {rev[..Math.Min(8, rev.Length)]}";
+            SelectedTab = 2;
+        });
+    }
+
+    /// <summary>Jump from a blame line (or anywhere) to a commit in the history tab.</summary>
+    public async Task ShowCommitAsync(string sha)
+    {
+        if (_fileFilter is not null)
+        {
+            await ClearFileHistoryAsync();
+        }
+
+        if (!string.IsNullOrEmpty(SearchText))
+        {
+            SearchText = "";
+        }
+
+        SelectedTab = 0;
+        SelectedItem = Items.FirstOrDefault(i => i.Commit?.Sha == sha);
+    }
+
+    public string? DetailSha => _detailSha;
+
     [RelayCommand]
     private void CloseRepo()
     {
@@ -187,7 +256,7 @@ public partial class MainViewModel : ObservableObject
         var keep = SelectedItem?.Commit?.Sha;
         await Guard(async () =>
         {
-            var commitsTask = repo.GetLogAsync();
+            var commitsTask = _fileFilter is { } ff ? repo.GetFileLogAsync(ff) : repo.GetLogAsync();
             var refsTask = repo.GetRefsAsync();
             var statusTask = repo.GetStatusAsync();
             var stashTask = repo.GetStashesAsync();
@@ -214,9 +283,11 @@ public partial class MainViewModel : ObservableObject
 
     private void BuildHistory(IReadOnlyList<Commit> commits, IReadOnlyList<GitRef> refs, WorkingStatus status)
     {
-        var rows = GraphLayout.Build(commits);
+        // A single file's history is not a connected graph, so draw plain rows.
+        var rows = _fileFilter is null ? GraphLayout.Build(commits) : commits.Select(c => new GraphRow(c, 0, 0, [], 1, false)).ToList();
         var lanes = Math.Min(rows.Count == 0 ? 1 : rows.Max(r => r.LaneCount), MaxLanesShown);
         GraphWidth = lanes * Controls.GraphCell.LaneWidth + 8;
+        OnPropertyChanged(nameof(HeaderGraphWidth));
 
         var labels = refs
             .Where(r => r.Kind != RefKind.Stash)
@@ -229,7 +300,7 @@ public partial class MainViewModel : ObservableObject
         _allItems = rows.Select(r => new HistoryItem
         {
             Commit = r.Commit,
-            Row = r,
+            Row = _fileFilter is null ? r : null,
             Subject = r.Commit.Subject,
             Author = r.Commit.AuthorName,
             Initials = RelativeTime.Initials(r.Commit.AuthorName),
@@ -237,11 +308,11 @@ public partial class MainViewModel : ObservableObject
             FullDate = r.Commit.AuthorDate.ToString("f"),
             ShortSha = r.Commit.ShortSha,
             Labels = labels.GetValueOrDefault(r.Commit.Sha) ?? [],
-            GraphWidth = GraphWidth,
+            GraphWidth = _fileFilter is null ? GraphWidth : 0,
         }).ToList();
 
         var changes = status.Staged.Count + status.Unstaged.Count;
-        if (changes > 0)
+        if (changes > 0 && _fileFilter is null)
         {
             _allItems.Insert(0, new HistoryItem
             {
@@ -288,6 +359,7 @@ public partial class MainViewModel : ObservableObject
 
     private void ApplyFilter(string? keepSha)
     {
+        OnPropertyChanged(nameof(HeaderGraphWidth));
         var q = SearchText.Trim();
         IEnumerable<HistoryItem> src = _allItems;
         if (q.Length > 0)

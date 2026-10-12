@@ -125,8 +125,14 @@
               <TabItem Header="History">
                 <Grid ColumnDefinitions="*,6,360">
                   <DockPanel>
+                    <Border DockPanel.Dock="Top" IsVisible="{Binding HasFileFilter}" Background="{DynamicResource HoverBrush}" Padding="12,5">
+                      <DockPanel>
+                        <Button DockPanel.Dock="Right" Classes="mini" Content="✕ Show all history" Command="{Binding ClearFileHistoryCommand}" />
+                        <TextBlock Text="{Binding FileFilterText}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      </DockPanel>
+                    </Border>
                     <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,150,96,64" Height="26" Background="{DynamicResource PanelAltBrush}">
-                      <Border Width="{Binding GraphWidth}" />
+                      <Border Width="{Binding HeaderGraphWidth}" />
                       <TextBlock Grid.Column="1" Text="MESSAGE" Classes="section" VerticalAlignment="Center" />
                       <TextBlock Grid.Column="2" Text="AUTHOR" Classes="section" VerticalAlignment="Center" />
                       <TextBlock Grid.Column="3" Text="DATE" Classes="section" VerticalAlignment="Center" />
@@ -191,7 +197,13 @@
                     <ListBox Grid.Row="2" ItemsSource="{Binding CommitFiles}" SelectedItem="{Binding SelectedCommitFile}" Classes="tight">
                       <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="m:FileChange">
-                          <StackPanel Orientation="Horizontal">
+                          <StackPanel Orientation="Horizontal" Background="Transparent">
+                            <StackPanel.ContextMenu>
+                              <ContextMenu>
+                                <MenuItem Header="Blame (at this commit)" Click="OnBlameCommitFile" />
+                                <MenuItem Header="File history" Click="OnFileHistory" />
+                              </ContextMenu>
+                            </StackPanel.ContextMenu>
                             <Border Classes="kind" Background="{Binding Kind, Converter={x:Static c:Converters.ChangeBrush}}"><TextBlock Text="{Binding Kind, Converter={x:Static c:Converters.ChangeLetter}}" /></Border>
                             <TextBlock Text="{Binding Path}" Classes="mono" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                           </StackPanel>
@@ -213,7 +225,13 @@
                     <ListBox ItemsSource="{Binding Unstaged}" SelectedItem="{Binding SelectedUnstaged}" Classes="tight">
                       <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="m:FileChange">
-                          <DockPanel>
+                          <DockPanel Background="Transparent">
+                            <DockPanel.ContextMenu>
+                              <ContextMenu>
+                                <MenuItem Header="Blame" Click="OnBlameWorkFile" />
+                                <MenuItem Header="File history" Click="OnFileHistory" />
+                              </ContextMenu>
+                            </DockPanel.ContextMenu>
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
                               <Button Classes="mini" Content="↶" ToolTip.Tip="Discard changes" Command="{Binding #Root.((vm:MainViewModel)DataContext).DiscardCommand}" CommandParameter="{Binding}" />
                               <Button Classes="mini" Content="＋" ToolTip.Tip="Stage" Command="{Binding #Root.((vm:MainViewModel)DataContext).StageCommand}" CommandParameter="{Binding}" />
@@ -233,7 +251,13 @@
                     <ListBox ItemsSource="{Binding Staged}" SelectedItem="{Binding SelectedStaged}" Classes="tight">
                       <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="m:FileChange">
-                          <DockPanel>
+                          <DockPanel Background="Transparent">
+                            <DockPanel.ContextMenu>
+                              <ContextMenu>
+                                <MenuItem Header="Blame" Click="OnBlameWorkFile" />
+                                <MenuItem Header="File history" Click="OnFileHistory" />
+                              </ContextMenu>
+                            </DockPanel.ContextMenu>
                             <Button DockPanel.Dock="Right" Classes="mini" Content="－" ToolTip.Tip="Unstage" Command="{Binding #Root.((vm:MainViewModel)DataContext).UnstageCommand}" CommandParameter="{Binding}" />
                             <Border Classes="kind" Background="{Binding Kind, Converter={x:Static c:Converters.ChangeBrush}}"><TextBlock Text="{Binding Kind, Converter={x:Static c:Converters.ChangeLetter}}" /></Border>
                             <TextBlock Text="{Binding Path}" Classes="mono" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
@@ -256,6 +280,28 @@
                     </TextBox>
                   </DockPanel>
                 </Grid>
+              </TabItem>
+
+              <!-- Blame -->
+              <TabItem Header="Blame">
+                <DockPanel>
+                  <Border DockPanel.Dock="Top" Padding="12,6" Background="{DynamicResource PanelAltBrush}">
+                    <TextBlock Text="{Binding BlameTitle}" Classes="mono" FontWeight="SemiBold" />
+                  </Border>
+                  <ListBox ItemsSource="{Binding BlameRows}" Classes="diff" DoubleTapped="OnBlameDoubleTapped" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:BlameRow">
+                        <Grid ColumnDefinitions="76,130,90,48,*" Height="20" Background="{Binding Stripe, Converter={x:Static c:Converters.StripeBackground}}">
+                          <TextBlock Text="{Binding Sha}" Classes="mono" Foreground="{DynamicResource AccentBrush}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="1" Text="{Binding Author}" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,8,0" />
+                          <TextBlock Grid.Column="2" Text="{Binding Date}" Classes="muted" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="3" Text="{Binding Line.LineNumber}" Classes="mono muted" TextAlignment="Right" Margin="0,0,10,0" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="4" Text="{Binding Line.Text}" Classes="mono" VerticalAlignment="Center" ToolTip.Tip="{Binding Line.Summary}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </DockPanel>
               </TabItem>
             </TabControl>
           </Border>

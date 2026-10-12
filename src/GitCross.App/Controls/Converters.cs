@@ -36,6 +36,8 @@ public static class Converters
         _ => " ",
     }).AsConverter();
 
+    public static readonly IValueConverter StripeBackground = new Func<bool, IBrush>(b => b ? new SolidColorBrush(Color.FromArgb(0x14, 0x80, 0x90, 0xB0)) : Brushes.Transparent).AsConverter();
+
     public static readonly IValueConverter LineNumber = new Func<int?, string>(n => n?.ToString(CultureInfo.InvariantCulture) ?? "").AsConverter();
 
     public static readonly IValueConverter ChangeLetter = new Func<ChangeKind, string>(k => k switch

@@ -178,6 +178,33 @@ public class WindowRenderTests
         Assert.DoesNotContain(vm.Sidebar, e => e.IsStash);
     }
 
+    [AvaloniaFact]
+    public async Task Blame_tab_and_file_history_work()
+    {
+        var repo = MakeRepo();
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        var w = new MainWindow(vm);
+        w.Show();
+        await vm.OpenAsync(repo);
+
+        await vm.ShowBlameAsync("a.txt", null);
+        await Settle();
+        Assert.Equal(2, vm.SelectedTab);
+        Assert.NotEmpty(vm.BlameRows);
+        Assert.True(vm.BlameRows[0].ShowMeta);
+        Shot(w, "08-blame.png");
+
+        await vm.ShowFileHistoryAsync("login.cs");
+        await Settle();
+        Assert.True(vm.HasFileFilter);
+        Assert.Equal(["Add login screen"], vm.Items.Select(i => i.Subject));
+        Shot(w, "09-file-history.png");
+
+        await vm.ShowCommitAsync(vm.Items[0].Commit!.Sha);
+        Assert.False(vm.HasFileFilter);
+        Assert.Equal("Add login screen", vm.SelectedItem?.Subject);
+    }
+
     private static void Git(string dir, string args)
     {
         var psi = new ProcessStartInfo("git", args) { WorkingDirectory = dir, RedirectStandardError = true, RedirectStandardOutput = true };
