@@ -133,4 +133,20 @@ public sealed class GitRepository
         => _git.OutAsync(message is null ? ["stash", "push", "-u"] : ["stash", "push", "-u", "-m", message]);
 
     public Task StashPopAsync() => _git.OutAsync("stash", "pop");
+
+    public Task CherryPickAsync(string sha) => _git.OutAsync("cherry-pick", sha);
+
+    /// <summary>Reverts a commit; merge commits are reverted against their first parent.</summary>
+    public async Task RevertAsync(string sha)
+    {
+        var parents = (await _git.OutAsync("rev-list", "--parents", "-n", "1", sha)).Split(' ', StringSplitOptions.RemoveEmptyEntries).Length - 1;
+        await (parents > 1 ? _git.OutAsync("revert", "--no-edit", "-m", "1", sha) : _git.OutAsync("revert", "--no-edit", sha));
+    }
+
+    public Task ResetAsync(string sha, ResetMode mode)
+        => _git.OutAsync("reset", mode switch { ResetMode.Soft => "--soft", ResetMode.Hard => "--hard", _ => "--mixed" }, sha);
+
+    public Task AbortAsync(string operation) => _git.OutAsync(operation, "--abort"); // merge | cherry-pick | revert | rebase
 }
+
+public enum ResetMode { Soft, Mixed, Hard }

@@ -1,3 +1,4 @@
+using GitCross.Core.Git;
 using GitCross.Core.Models;
 
 namespace GitCross.Core.Tests;
@@ -66,4 +67,61 @@ public class CloneNamingTests
     [InlineData("/srv/git/local", "local")]
     public void Suggests_folder_name(string url, string expected)
         => Assert.Equal(expected, Git.GitRepository.SuggestFolderName(url));
+}
+
+public class HistoryEditingTests
+{
+    private static async Task<(TempRepo T, Git.GitRepository R, string[] Shas)> Seed()
+    {
+        var (t, r) = await TempRepo.CreateAsync();
+        var shas = new List<string>();
+        foreach (var n in new[] { "a", "b", "c" })
+        {
+            t.Write($"{n}.txt", n);
+            await r.StageAsync([$"{n}.txt"]);
+            await r.CommitAsync(n);
+            shas.Add((await r.GetLogAsync())[0].Sha);
+        }
+
+        return (t, r, [.. shas]);
+    }
+
+    [Fact]
+    public async Task Revert_adds_inverse_commit()
+    {
+        var (t, r, s) = await Seed();
+        using (t)
+        {
+            await r.RevertAsync(s[2]);
+            Assert.False(File.Exists(Path.Combine(t.Path, "c.txt")));
+            Assert.StartsWith("Revert", (await r.GetLogAsync())[0].Subject);
+        }
+    }
+
+    [Fact]
+    public async Task Reset_hard_and_soft()
+    {
+        var (t, r, s) = await Seed();
+        using (t)
+        {
+            await r.ResetAsync(s[1], ResetMode.Soft);
+            Assert.Equal(2, (await r.GetLogAsync()).Count);
+            Assert.Single((await r.GetStatusAsync()).Staged); // c.txt still staged
+            await r.ResetAsync(s[0], ResetMode.Hard);
+            Assert.False(File.Exists(Path.Combine(t.Path, "b.txt")));
+        }
+    }
+
+    [Fact]
+    public async Task CherryPick_applies_commit_from_other_branch()
+    {
+        var (t, r, s) = await Seed();
+        using (t)
+        {
+            await r.CreateBranchAsync("side", s[0]);
+            await r.CherryPickAsync(s[2]);
+            Assert.True(File.Exists(Path.Combine(t.Path, "c.txt")));
+            Assert.False(File.Exists(Path.Combine(t.Path, "b.txt")));
+        }
+    }
 }
