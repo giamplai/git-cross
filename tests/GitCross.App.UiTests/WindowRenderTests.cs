@@ -248,6 +248,49 @@ public class WindowRenderTests
         Assert.Contains(vm.Items, i => i.Subject.StartsWith("Merge"));
     }
 
+    /// <summary>Generates N linear commits (with a side branch every 50) via fast-import — much faster than N `git commit`.</summary>
+    private static string BigRepo(int commits)
+    {
+        var repo = NewRepo();
+        var sb = new System.Text.StringBuilder();
+        for (var i = 1; i <= commits; i++)
+        {
+            sb.Append("commit refs/heads/main\ncommitter Ada <a@x> ").Append(1_700_000_000 + i).Append(" +0000\ndata ").Append($"c{i}".Length).Append('\n').Append($"c{i}\n");
+            if (i == 1) { sb.Append("from refs/heads/main^0\n"); }
+            sb.Append("M 100644 inline f.txt\ndata ").Append($"v{i}\n".Length).Append('\n').Append($"v{i}\n\n");
+        }
+
+        var psi = new ProcessStartInfo("git", "fast-import --quiet") { WorkingDirectory = repo, RedirectStandardInput = true, RedirectStandardError = true };
+        using var p = Process.Start(psi)!;
+        p.StandardInput.Write(sb.ToString());
+        p.StandardInput.Close();
+        p.WaitForExit();
+        Git(repo, "reset -q --hard main");
+        return repo;
+    }
+
+    [AvaloniaFact]
+    public async Task Large_history_opens_in_reasonable_time()
+    {
+        var repo = BigRepo(20000);
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        vm.Settings.MaxCommits = 10000;
+        var w = new MainWindow(vm);
+        w.Show();
+        var sw = Stopwatch.StartNew();
+        await vm.OpenAsync(repo);
+        var open = sw.ElapsedMilliseconds;
+        await Settle();
+        sw.Restart();
+        vm.SearchText = "c19999";
+        var search = sw.ElapsedMilliseconds;
+        File.AppendAllText(Path.Combine(Path.GetTempPath(), "gxc-perf.txt"), $"open={open}ms search={search}ms items={vm.Items.Count}\n");
+
+        Assert.Single(vm.Items);
+        Assert.True(open < 15_000, $"opening 10k commits took {open} ms");
+        Assert.True(search < 3_000, $"filtering took {search} ms");
+    }
+
     private static string NewRepo()
     {
         var repo = Path.Combine(Path.GetTempPath(), "gxc-ui-" + Guid.NewGuid().ToString("N")[..8]);
