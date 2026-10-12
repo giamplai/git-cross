@@ -143,7 +143,17 @@ public sealed class GitRepository
 
     public Task CreateTagAsync(string name, string? sha = null) => _git.OutAsync(sha is null ? ["tag", name] : ["tag", name, sha]);
 
-    public Task MergeAsync(string branch) => _git.OutAsync("merge", branch);
+    public Task MergeAsync(string branch, MergeMode mode = MergeMode.Default)
+        => _git.OutAsync(mode switch
+        {
+            MergeMode.NoFastForward => ["merge", "--no-ff", branch],
+            MergeMode.FastForwardOnly => ["merge", "--ff-only", branch],
+            MergeMode.Squash => ["merge", "--squash", branch], // stages the result; the user commits it
+            _ => ["merge", branch],
+        });
+
+    /// <summary>Replays the current branch's commits on top of <paramref name="onto"/>. Conflicts leave a Rebase operation in progress.</summary>
+    public Task RebaseAsync(string onto) => _git.OutAsync("rebase", onto);
 
     public Task FetchAsync() => _git.OutAsync("fetch", "--all", "--prune");
 
@@ -245,3 +255,5 @@ public sealed class GitRepository
 }
 
 public enum ResetMode { Soft, Mixed, Hard }
+
+public enum MergeMode { Default, NoFastForward, FastForwardOnly, Squash }
