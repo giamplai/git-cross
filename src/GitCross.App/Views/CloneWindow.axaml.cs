@@ -63,7 +63,7 @@ public partial class CloneWindow : Window
         CloneButton.IsEnabled = false;
         try
         {
-            var repo = await GitRepository.CloneAsync(UrlBox.Text.Trim(), target);
+            var repo = await GitRepository.CloneAsync(UrlBox.Text.Trim(), target, RecursiveBox.IsChecked == true);
             Close(repo.Root);
         }
         catch (GitException ex)

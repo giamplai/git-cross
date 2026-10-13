@@ -85,13 +85,21 @@ public static class Converters
     public static readonly IValueConverter AvatarBrush = new Func<string, IBrush>(
         name => AvatarPalette[(name.Aggregate(17, (h, c) => unchecked(h * 31 + c)) & 0x7fffffff) % AvatarPalette.Length]).AsConverter();
 
-    public static readonly IValueConverter SidebarGlyph = new Func<SidebarEntry, string>(e => e.Stash is not null ? "📦" : e.Ref switch
+    public static readonly IValueConverter SidebarGlyph = new Func<SidebarEntry, string>(e => e.Stash is not null ? "📦" : e.Submodule is { } sm ? SubmoduleGlyph(sm.State) : e.Ref switch
     {
         { IsCurrent: true } => "●",
         { Kind: RefKind.Tag } => "🏷",
         { Kind: RefKind.RemoteBranch } => "☁",
         _ => "⎇",
     }).AsConverter();
+
+    private static string SubmoduleGlyph(GitCross.Core.Submodules.SubmoduleState s) => s switch
+    {
+        GitCross.Core.Submodules.SubmoduleState.NotInitialized => "○",
+        GitCross.Core.Submodules.SubmoduleState.Modified => "↻",
+        GitCross.Core.Submodules.SubmoduleState.Conflicted => "⚠",
+        _ => "◆",
+    };
 
     private static IValueConverter AsConverter<TIn, TOut>(this Func<TIn, TOut> f) => new FuncConverter<TIn, TOut>(f);
 

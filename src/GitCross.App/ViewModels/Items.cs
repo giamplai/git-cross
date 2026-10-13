@@ -1,5 +1,6 @@
 using GitCross.Core.Graph;
 using GitCross.Core.Models;
+using GitCross.Core.Submodules;
 
 namespace GitCross.App.ViewModels;
 
@@ -21,8 +22,11 @@ public sealed class HistoryItem
     public double GraphWidth { get; init; }
 }
 
-public sealed record SidebarEntry(string Text, GitRef? Ref = null, bool IsHeader = false, string Count = "", StashEntry? Stash = null)
+public sealed record SidebarEntry(string Text, GitRef? Ref = null, bool IsHeader = false, string Count = "", StashEntry? Stash = null, SubmoduleInfo? Submodule = null)
 {
+    public bool IsSubmodule => Submodule is not null;
+    public bool IsSubmoduleHeader => IsHeader && Text == "SUBMODULES";
+    public string? Tip => Submodule is { } m ? $"{m.Path}\n{m.Url}\n{m.State}{(m.Describe is null ? "" : "  ·  " + m.Describe)}" : null;
     public bool IsItem => !IsHeader;
     public bool IsRefItem => Ref is not null;
     public bool IsStash => Stash is not null;

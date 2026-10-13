@@ -94,6 +94,10 @@ public partial class MainWindow : Window
         {
             _vm.CheckoutRefCommand.Execute(r);
         }
+        else if (_vm.SelectedSidebar?.Submodule is { } sub)
+        {
+            _ = _vm.OpenSubmoduleAsync(sub);
+        }
     }
 
     private static Core.Models.GitRef? RefOf(object? sender)
@@ -207,6 +211,21 @@ public partial class MainWindow : Window
 
         await _vm.ResetToAsync(i.Commit!.Sha, mode);
     }
+
+    private static Core.Submodules.SubmoduleInfo? SubOf(object? sender)
+        => (sender as Control)?.DataContext is SidebarEntry { Submodule: { } m } ? m : null;
+
+    private async void OnSubmoduleOpen(object? s, RoutedEventArgs e)
+    {
+        if (SubOf(s) is { } m) { await _vm.OpenSubmoduleAsync(m); }
+    }
+
+    private async void OnSubmoduleUpdate(object? s, RoutedEventArgs e)
+    {
+        if (SubOf(s) is { } m) { await _vm.UpdateSubmoduleAsync(m); }
+    }
+
+    private void OnSubmoduleUpdateAll(object? s, RoutedEventArgs e) => _vm.UpdateAllSubmodulesCommand.Execute(null);
 
     private static Core.Models.StashEntry? StashOf(object? sender)
         => (sender as Control)?.DataContext is SidebarEntry { Stash: { } st } ? st : null;

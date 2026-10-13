@@ -9,6 +9,7 @@ using GitCross.Core.Graph;
 using GitCross.Core.Models;
 using GitCross.Core.Rebase;
 using GitCross.Core.Settings;
+using GitCross.Core.Submodules;
 using GitCross.Core.Util;
 
 namespace GitCross.App.ViewModels;
@@ -25,6 +26,8 @@ public partial class MainViewModel : ObservableObject
     private List<HistoryItem> _allItems = [];
     private IReadOnlyList<GitRef> _refs = [];
     private IReadOnlyList<StashEntry> _stashes = [];
+    private IReadOnlyList<SubmoduleInfo> _submodules = [];
+    private readonly Stack<string> _parents = new(); // superprojects we descended from; lets "Back" return
     private string? _fileFilter; // when set, history lists only commits touching this file
     private string? _detailSha; // commit or stash whose files are listed
     private int _busy;
@@ -69,6 +72,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private ThemeVariant _themeVariant = ThemeVariant.Default;
 
     public bool HasRepo => RepoName is not null;
+    public bool HasParent => _parents.Count > 0;
+    public string BackText => _parents.Count > 0 ? $"◀  Back to {Path.GetFileName(_parents.Peek().TrimEnd('/', '\\'))}" : "";
     public string UnstagedHeader => $"Unstaged changes ({Unstaged.Count})";
     public string StagedHeader => $"Staged changes ({Staged.Count})";
     public int SummaryLength => CommitMessage.Split('\n')[0].Length;
@@ -205,6 +210,24 @@ public partial class MainViewModel : ObservableObject
 
     public async Task<bool> OpenAsync(string path)
     {
+        var opened = await OpenCoreAsync(path, remember: true);
+        if (opened)
+        {
+            _parents.Clear();
+            NotifyParent();
+        }
+
+        return opened;
+    }
+
+    private void NotifyParent()
+    {
+        OnPropertyChanged(nameof(HasParent));
+        OnPropertyChanged(nameof(BackText));
+    }
+
+    private async Task<bool> OpenCoreAsync(string path, bool remember)
+    {
         var repo = await GitRepository.OpenAsync(path);
         if (repo is null)
         {
@@ -214,12 +237,17 @@ public partial class MainViewModel : ObservableObject
 
         _repo = repo;
         RepoName = repo.Name;
-        _settings.AddRecent(repo.Root);
-        SaveSettings();
-        Recent.Clear();
-        foreach (var p in _settings.RecentRepositories)
+        _fileFilter = null;
+        FileFilterPath = null;
+        if (remember)
         {
-            Recent.Add(new RecentRepo(Path.GetFileName(p.TrimEnd('/', '\\')), p));
+            _settings.AddRecent(repo.Root);
+            SaveSettings();
+            Recent.Clear();
+            foreach (var p in _settings.RecentRepositories)
+            {
+                Recent.Add(new RecentRepo(Path.GetFileName(p.TrimEnd('/', '\\')), p));
+            }
         }
 
         SearchText = "";
@@ -334,7 +362,9 @@ public partial class MainViewModel : ObservableObject
             var refsTask = repo.GetRefsAsync();
             var statusTask = repo.GetStatusAsync();
             var stashTask = repo.GetStashesAsync();
-            await Task.WhenAll(commitsTask, refsTask, statusTask, stashTask);
+            var subTask = repo.GetSubmodulesAsync();
+            await Task.WhenAll(commitsTask, refsTask, statusTask, stashTask, subTask);
+            _submodules = subTask.Result;
             var (commits, refs, status) = (commitsTask.Result, refsTask.Result, statusTask.Result);
             _stashes = stashTask.Result;
             var op = await repo.GetOperationAsync();
@@ -431,6 +461,15 @@ public partial class MainViewModel : ObservableObject
         Group("BRANCHES", RefKind.LocalBranch);
         Group("REMOTES", RefKind.RemoteBranch);
         Group("TAGS", RefKind.Tag);
+
+        if (_submodules.Count > 0)
+        {
+            Sidebar.Add(new SidebarEntry("SUBMODULES", IsHeader: true, Count: _submodules.Count.ToString()));
+            foreach (var m in _submodules)
+            {
+                Sidebar.Add(new SidebarEntry(m.Path, Submodule: m));
+            }
+        }
 
         if (_stashes.Count > 0)
         {
@@ -877,6 +916,47 @@ public partial class MainViewModel : ObservableObject
             NewBranchName = "";
         }
     }
+
+    /// <summary>Opens an initialized submodule as its own repository, remembering the superproject for "Back".</summary>
+    public async Task OpenSubmoduleAsync(SubmoduleInfo sub)
+    {
+        if (_repo is not { } parent)
+        {
+            return;
+        }
+
+        if (!sub.IsInitialized)
+        {
+            IsError = false;
+            StatusText = $"{sub.Path} is not initialized yet: right-click → Initialize / update.";
+            return;
+        }
+
+        var parentRoot = parent.Root;
+        if (await OpenCoreAsync(parent.SubmoduleFullPath(sub), remember: false))
+        {
+            _parents.Push(parentRoot);
+            NotifyParent();
+        }
+    }
+
+    [RelayCommand]
+    private async Task BackToParentAsync()
+    {
+        if (_parents.Count == 0)
+        {
+            return;
+        }
+
+        var target = _parents.Pop();
+        NotifyParent();
+        await OpenCoreAsync(target, remember: false);
+    }
+
+    public Task UpdateSubmoduleAsync(SubmoduleInfo sub) => Mutate(() => _repo!.SubmoduleUpdateAsync(sub.Path), sub);
+
+    [RelayCommand]
+    private Task UpdateAllSubmodulesAsync() => Mutate(() => _repo!.SubmoduleUpdateAsync(), _submodules.Count > 0);
 
     public Task StashApplyAsync(StashEntry s) => Mutate(() => _repo!.StashApplyAsync(s), s);
 

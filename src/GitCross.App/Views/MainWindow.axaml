@@ -15,6 +15,7 @@
     <Border DockPanel.Dock="Top" Padding="10,6" Background="{DynamicResource PanelBrush}" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource LineBrush}">
       <DockPanel LastChildFill="False">
         <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="2">
+          <Button Classes="tool" Content="{Binding BackText}" Command="{Binding BackToParentCommand}" IsVisible="{Binding HasParent}" />
           <Button Classes="tool" Content="📂  Open" Click="OnOpenClick" HotKey="Ctrl+O" />
           <Button Classes="tool" Content="⬇  Clone" Click="OnCloneClick" />
           <Button Classes="tool" Content="✚  Init" Click="OnInitClick" />
@@ -100,11 +101,16 @@
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:SidebarEntry">
                 <Grid>
-                  <DockPanel IsVisible="{Binding IsHeader}" Margin="0,10,0,2">
+                  <DockPanel IsVisible="{Binding IsHeader}" Margin="0,10,0,2" Background="Transparent">
+                    <DockPanel.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Initialize / update all submodules" Click="OnSubmoduleUpdateAll" IsVisible="{Binding IsSubmoduleHeader}" />
+                      </ContextMenu>
+                    </DockPanel.ContextMenu>
                     <TextBlock DockPanel.Dock="Right" Text="{Binding Count}" Classes="section" />
                     <TextBlock Text="{Binding Text}" Classes="section" />
                   </DockPanel>
-                  <StackPanel IsVisible="{Binding IsItem}" Orientation="Horizontal" Spacing="8" Background="Transparent">
+                  <StackPanel IsVisible="{Binding IsItem}" Orientation="Horizontal" Spacing="8" Background="Transparent" ToolTip.Tip="{Binding Tip}">
                     <StackPanel.ContextMenu>
                       <ContextMenu>
                         <MenuItem Header="Checkout" Click="OnSidebarCheckout" IsVisible="{Binding IsRefItem}" />
@@ -113,6 +119,8 @@
                         <MenuItem Header="Merge (squash into staged changes)" Click="OnSidebarMergeSquash" IsVisible="{Binding IsRefItem}" />
                         <MenuItem Header="Rebase current branch onto this" Click="OnSidebarRebase" IsVisible="{Binding IsRefItem}" />
                         <MenuItem Header="Delete branch" Click="OnSidebarDelete" IsVisible="{Binding IsRefItem}" />
+                        <MenuItem Header="Open submodule repository" Click="OnSubmoduleOpen" IsVisible="{Binding IsSubmodule}" />
+                        <MenuItem Header="Initialize / update this submodule" Click="OnSubmoduleUpdate" IsVisible="{Binding IsSubmodule}" />
                         <MenuItem Header="Apply stash (keep)" Click="OnStashApply" IsVisible="{Binding IsStash}" />
                         <MenuItem Header="Pop stash (apply and drop)" Click="OnStashPop" IsVisible="{Binding IsStash}" />
                         <MenuItem Header="Drop stash" Click="OnStashDrop" IsVisible="{Binding IsStash}" />
@@ -212,7 +220,7 @@
                       <Button Classes="mini" Content="Branch here" Command="{Binding CreateBranchCommand}" />
                       <Button Classes="mini" Content="Checkout" Command="{Binding CheckoutCommitCommand}" />
                     </StackPanel>
-                    <Border Grid.Row="1" Background="{DynamicResource PanelAltBrush}" CornerRadius="6" Padding="10" MaxHeight="190" Margin="0,0,0,8">
+                    <Border Grid.Row="1" Background="{DynamicResource PanelAltBrush}" CornerRadius="6" Padding="10" MaxHeight="190" Margin="0,0,0,8" IsVisible="{Binding CommitInfo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                       <ScrollViewer><SelectableTextBlock Text="{Binding CommitInfo}" TextWrapping="Wrap" FontSize="12.5" /></ScrollViewer>
                     </Border>
                     <ListBox Grid.Row="2" ItemsSource="{Binding CommitFiles}" SelectedItem="{Binding SelectedCommitFile}" Classes="tight">

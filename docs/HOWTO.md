@@ -11,7 +11,7 @@ All screenshots are generated from the real application by `scripts/update-docs.
 2. [The welcome screen: open, clone, init](#2-the-welcome-screen-open-clone-init)
 3. [Window overview](#3-window-overview)
 4. [Toolbar](#4-toolbar)
-5. [Sidebar: branches, remotes, tags, stashes](#5-sidebar-branches-remotes-tags-stashes)
+5. [Sidebar: branches, remotes, tags, stashes, submodules](#5-sidebar-branches-remotes-tags-stashes-submodules)
 6. [History and the commit graph](#6-history-and-the-commit-graph)
 7. [Searching commits](#7-searching-commits)
 8. [Commit details and the diff viewer](#8-commit-details-and-the-diff-viewer)
@@ -20,6 +20,7 @@ All screenshots are generated from the real application by `scripts/update-docs.
 10b. [Interactive rebase](#10b-interactive-rebase)
 11. [Fetch, pull and push](#11-fetch-pull-and-push)
 12. [Stashes](#12-stashes)
+12b. [Submodules](#12b-submodules)
 13. [Rewriting and moving: cherry-pick, revert, reset](#13-cherry-pick-revert-reset)
 14. [Blame and file history](#14-blame-and-file-history)
 15. [Resolving conflicts](#15-resolving-conflicts)
@@ -67,7 +68,7 @@ Below the buttons, **Recent** lists the last 15 repositories; click one to open 
 
 1. Paste the **Repository URL** (HTTPS, SSH or a local path).
 2. Choose the **Destination folder** (the parent folder; use **Browse…**). The dialog shows the exact folder that will be created, taken from the URL (`…/gitextensions.git` → `gitextensions`). The last folder you used is remembered.
-3. Click **Clone**. A progress bar is shown. On success the new repository opens automatically.
+3. Leave **Also clone submodules (recursive)** ticked to fetch nested repositories too (untick for a faster clone and initialize them later), then click **Clone**. A progress bar is shown. On success the new repository opens automatically.
 
 Errors (empty URL, destination already exists and is not empty, network or authentication failures) appear in red inside the dialog and nothing is created. Clone never prompts interactively; use an SSH key or a configured credential helper for private repositories.
 
@@ -90,6 +91,7 @@ Drag the thin separators between areas to resize them. The window refreshes itse
 | Control | Action |
 |---|---|
 | **Open / Clone / Init** | See [section 2](#2-the-welcome-screen-open-clone-init). |
+| **◀ Back to …** | Only shown while you are inside a submodule: returns to the repository you opened it from ([section 12b](#12b-submodules)). |
 | **Branch pill** | Shows the current branch (or "detached HEAD") and, when the branch tracks a remote, `↑ahead ↓behind` commit counts. |
 | **Refresh** (**F5**) | Reload history, refs and working tree. |
 | **Fetch** | `git fetch --all --prune`. |
@@ -103,7 +105,7 @@ Drag the thin separators between areas to resize them. The window refreshes itse
 
 While a git command runs, a progress bar appears at the right of the status bar.
 
-## 5. Sidebar: branches, remotes, tags, stashes
+## 5. Sidebar: branches, remotes, tags, stashes, submodules
 
 ![Sidebar with a stash selected](images/stash.png)
 
@@ -113,6 +115,7 @@ The sidebar lists, with counts:
 * **REMOTES** – remote-tracking branches such as `origin/main`.
 * **TAGS** – all tags.
 * **STASHES** – saved stashes (only shown when you have some).
+* **SUBMODULES** – the repository's submodules (only shown when it has any); see [section 12b](#12b-submodules).
 
 Interactions:
 
@@ -304,6 +307,28 @@ Stashing saves your uncommitted work (including untracked files) and restores a 
 
 The toolbar **Pop** button pops the newest stash.
 
+## 12b. Submodules
+
+![Submodules section of the sidebar](images/submodules.png)
+
+A submodule is another git repository nested inside yours at a fixed commit. When a repository has submodules, the sidebar shows a **SUBMODULES** section with one entry per submodule and a status icon (hover for its path, URL and details):
+
+| Icon | Meaning |
+|---|---|
+| ◆ | **Up to date** — checked out at the commit your repository records. |
+| ○ | **Not initialized** — listed in `.gitmodules` but not cloned yet (typical right after a plain clone). |
+| ↻ | **Modified** — the submodule is checked out at a different commit than the one recorded (it has new commits, or you moved it). The change shows up as a modified file in the **Commit** tab; stage and commit it to record the new commit. |
+| ⚠ | **Conflicted** — the submodule entry has a merge conflict. |
+
+What you can do:
+
+* **Double-click** a submodule (or right-click → **Open submodule repository**) to open it as a repository in its own right: you can browse its history, commit, branch and push there. A **◀ Back to …** button appears at the left of the toolbar to return to the repository you came from. Submodules you open this way are not added to the *Recent* list.
+* Right-click → **Initialize / update this submodule** clones a not-initialized submodule (and its own nested submodules) and checks out the recorded commit. Updating a submodule you have moved discards that move and returns it to the recorded commit.
+* Right-click the **SUBMODULES** header → **Initialize / update all submodules**.
+* When **cloning**, keep **Also clone submodules (recursive)** ticked in the clone dialog to get everything in one step.
+
+Trying to open an uninitialized submodule tells you to initialize it first. Adding a new submodule and changing its URL are still done from the command line (`git submodule add <url> <path>`); the app picks them up on the next refresh.
+
 ## 13. Cherry-pick, revert, reset
 
 All three are in the commit context menu (section 6).
@@ -432,4 +457,4 @@ Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete u
 * Staging works per file, per hunk and per selected line (unified view only; not for untracked files).
 * Diffs highlight changes but have no language syntax coloring yet. In side-by-side mode lines are paired by position, so when a block changes many lines the pairs can look offset.
 * The history view loads a limited number of commits (2000 by default; see Settings).
-* Submodules, plugins, shell integration and localization are not implemented yet (see `docs/PORTING.md`).
+* Submodules can be listed, initialized, updated and opened, but adding/removing them or editing their URLs is not available in the app yet. Plugins, shell integration and localization are not implemented yet (see `docs/PORTING.md`).

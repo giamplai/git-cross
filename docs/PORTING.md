@@ -21,7 +21,7 @@
 | Interactive rebase (pick/reword/squash/fixup/drop, reorder) | Done | edit/exec/merges not supported |
 | Conflict resolution | Done | banner, marker view, accept ours/theirs, continue/abort for merge, cherry-pick, revert, rebase; no 3-way merge editor yet |
 | Blame / file history | Done | right-click a file: blame (at commit or work tree), file history with renames; double-click blame line jumps to commit |
-| Submodules | Todo | |
+| Submodules (list, init/update, open, clone recursive) | Done | add/remove/set-url not in UI |
 | Interactive rebase | Todo | |
 | Search/filter commits | Todo | |
 | Plugins | Todo | design a cross-platform extension API |

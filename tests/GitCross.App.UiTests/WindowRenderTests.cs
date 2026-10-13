@@ -455,6 +455,71 @@ public class WindowRenderTests
         Assert.Contains("No commits", vm.StatusText);
     }
 
+    [AvaloniaFact]
+    public async Task Submodules_are_listed_and_can_be_opened_and_left()
+    {
+        Environment.SetEnvironmentVariable("GIT_CONFIG_COUNT", "1");
+        Environment.SetEnvironmentVariable("GIT_CONFIG_KEY_0", "protocol.file.allow");
+        Environment.SetEnvironmentVariable("GIT_CONFIG_VALUE_0", "always");
+        try
+        {
+            var alpha = NewRepo();
+            var beta = NewRepo();
+            var super = NewRepo();
+            Git(super, $"submodule add -q \"{alpha}\" libs/alpha");
+            Git(super, $"submodule add -q \"{beta}\" libs/beta");
+            Git(super, "commit -qm \"add submodules\"");
+
+            // a plain clone starts with both uninitialized; initialize only alpha, then move alpha ahead
+            var work = Path.Combine(Path.GetTempPath(), "gxc-ui-work-" + Guid.NewGuid().ToString("N")[..8]);
+            Git(Path.GetTempPath(), $"clone -q \"{super}\" \"{work}\"");
+            Git(work, "submodule update --init -q libs/alpha");
+            File.WriteAllText(Path.Combine(work, "libs", "alpha", "new.txt"), "x");
+            Git(Path.Combine(work, "libs", "alpha"), "config user.name Ada"); Git(Path.Combine(work, "libs", "alpha"), "config user.email a@x");
+            Git(Path.Combine(work, "libs", "alpha"), "add .");
+            Git(Path.Combine(work, "libs", "alpha"), "commit -qm \"alpha moves ahead\"");
+
+            var vm = new MainViewModel(new SettingsStore(Path.Combine(work, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+            var w = new MainWindow(vm);
+            w.Show();
+            await vm.OpenAsync(work);
+            await Settle();
+
+            var subs = vm.Sidebar.Where(e => e.IsSubmodule).ToList();
+            Assert.Equal(["libs/alpha", "libs/beta"], subs.Select(e => e.Text));
+            Assert.Equal(Core.Submodules.SubmoduleState.Modified, subs[0].Submodule!.State);
+            Assert.Equal(Core.Submodules.SubmoduleState.NotInitialized, subs[1].Submodule!.State);
+            Shot(w, "submodules.png");
+
+            // an uninitialized submodule cannot be opened
+            await vm.OpenSubmoduleAsync(subs[1].Submodule!);
+            Assert.False(vm.HasParent);
+            Assert.Contains("not initialized", vm.StatusText);
+
+            // initialize it from the app, then open it
+            await vm.UpdateSubmoduleAsync(subs[1].Submodule!);
+            Assert.Equal(Core.Submodules.SubmoduleState.UpToDate, vm.Sidebar.Single(e => e.Submodule?.Path == "libs/beta").Submodule!.State);
+
+            var recentBefore = vm.Recent.Count;
+            await vm.OpenSubmoduleAsync(vm.Sidebar.Single(e => e.Submodule?.Path == "libs/alpha").Submodule!);
+            Assert.True(vm.HasParent);
+            Assert.Equal("alpha", vm.RepoName);
+            Assert.Contains(vm.Items, i => i.Subject == "alpha moves ahead");
+            Assert.StartsWith("◀  Back to gxc-ui-work-", vm.BackText);
+            Assert.Equal(recentBefore, vm.Recent.Count); // submodules do not pollute the recent list
+
+            await vm.BackToParentCommand.ExecuteAsync(null);
+            Assert.False(vm.HasParent);
+            Assert.Equal(Path.GetFileName(work), vm.RepoName);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GIT_CONFIG_COUNT", null);
+            Environment.SetEnvironmentVariable("GIT_CONFIG_KEY_0", null);
+            Environment.SetEnvironmentVariable("GIT_CONFIG_VALUE_0", null);
+        }
+    }
+
     private static string NewRepo()
     {
         var repo = Path.Combine(Path.GetTempPath(), "gxc-ui-" + Guid.NewGuid().ToString("N")[..8]);

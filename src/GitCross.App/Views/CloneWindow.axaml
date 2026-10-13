@@ -17,6 +17,7 @@
       </DockPanel>
       <TextBlock x:Name="TargetText" Classes="muted" FontSize="12" />
     </StackPanel>
+    <CheckBox x:Name="RecursiveBox" IsChecked="True" Content="Also clone submodules (recursive)" />
     <TextBlock x:Name="ErrorText" Foreground="#E5484D" TextWrapping="Wrap" IsVisible="False" />
     <ProgressBar x:Name="Progress" IsIndeterminate="True" IsVisible="False" />
     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
