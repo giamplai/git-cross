@@ -2,6 +2,7 @@ using GitCross.Core.Blame;
 using GitCross.Core.Diff;
 using GitCross.Core.Models;
 using GitCross.Core.Rebase;
+using GitCross.Core.Submodules;
 
 namespace GitCross.Core.Git;
 
@@ -52,11 +53,11 @@ public sealed class GitRepository
         return i >= 0 ? u[(i + 1)..] : u;
     }
 
-    public static async Task<GitRepository> CloneAsync(string url, string target)
+    public static async Task<GitRepository> CloneAsync(string url, string target, bool recursive = false)
     {
         var parent = Path.GetDirectoryName(Path.GetFullPath(target))!;
         Directory.CreateDirectory(parent);
-        await new GitRunner(parent).OutAsync("clone", url, target);
+        await new GitRunner(parent).OutAsync(recursive ? ["clone", "--recurse-submodules", url, target] : ["clone", url, target]);
         return (await OpenAsync(target))!;
     }
 
@@ -85,6 +86,36 @@ public sealed class GitRepository
         var r = await _git.RunAsync(["log", "--follow", $"--max-count={max}", $"--format={Parsers.LogFormat}", "--", path], null, default);
         return r.Success ? Parsers.ParseLog(r.StdOut).ToList() : [];
     }
+
+    /// <summary>Submodules of this repository (empty when it has none).</summary>
+    public async Task<IReadOnlyList<SubmoduleInfo>> GetSubmodulesAsync()
+    {
+        if (!File.Exists(Path.Combine(Root, ".gitmodules")))
+        {
+            return [];
+        }
+
+        var cfg = await _git.RunAsync(["config", "-f", ".gitmodules", "-z", "--get-regexp", @"^submodule\..*\.(path|url)$"], null, default);
+        var map = cfg.Success ? SubmoduleParser.ParseModulesConfig(cfg.StdOut) : [];
+        var status = await _git.RunAsync("submodule", "status");
+        return status.Success ? SubmoduleParser.ParseStatus(status.StdOut, map) : [];
+    }
+
+    /// <summary>Clones missing submodules and checks out the recorded commits (all of them, or just <paramref name="path"/>).</summary>
+    public Task SubmoduleUpdateAsync(string? path = null, bool recursive = true)
+    {
+        List<string> a = ["submodule", "update", "--init"];
+        if (recursive) { a.Add("--recursive"); }
+        if (path is not null) { a.AddRange(["--", path]); }
+        return _git.OutAsync([.. a]);
+    }
+
+    public Task SubmoduleAddAsync(string url, string path) => _git.OutAsync("submodule", "add", url, path);
+
+    /// <summary>Re-reads .gitmodules URLs into the repository configuration.</summary>
+    public Task SubmoduleSyncAsync() => _git.OutAsync("submodule", "sync", "--recursive");
+
+    public string SubmoduleFullPath(SubmoduleInfo s) => ResolvePath(s.Path);
 
     public async Task<IReadOnlyList<GitRef>> GetRefsAsync()
         => Parsers.ParseRefs(await _git.OutAsync("for-each-ref", $"--format={Parsers.RefFormat}")).ToList();
