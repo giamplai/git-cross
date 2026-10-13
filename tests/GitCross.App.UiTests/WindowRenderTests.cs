@@ -589,6 +589,7 @@ public class WindowRenderTests
             await Settle();
             Assert.Equal("Ada Lovelace", dlg.FindControl<TextBox>("NameBox")!.Text);
             Assert.StartsWith("✓ git version", dlg.FindControl<TextBlock>("GitStatusText")!.Text);
+            Assert.Matches(@"^git-cross \d+\.\d+\.\d+", dlg.FindControl<TextBlock>("VersionText")!.Text);
             Shot(dlg, "settings-dialog.png");
             dlg.Close();
         }

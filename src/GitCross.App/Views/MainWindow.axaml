@@ -7,6 +7,7 @@
         x:Name="Root"
         x:Class="GitCross.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
+        Icon="/Assets/icon.png"
         RequestedThemeVariant="{Binding ThemeVariant}"
         Title="{Binding RepoName, StringFormat='{}{0} — git-cross', FallbackValue='git-cross'}"
         Width="1360" Height="840" MinWidth="900" MinHeight="560">

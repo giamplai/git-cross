@@ -37,9 +37,12 @@
     </StackPanel>
 
     <TextBlock x:Name="ErrorText" Foreground="#E5484D" TextWrapping="Wrap" IsVisible="False" />
-    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-      <Button Content="Cancel" Click="OnCancel" />
-      <Button Classes="accent" Content="Save" Padding="22,6" Click="OnSave" IsDefault="True" />
-    </StackPanel>
+    <DockPanel>
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+        <Button Content="Cancel" Click="OnCancel" />
+        <Button Classes="accent" Content="Save" Padding="22,6" Click="OnSave" IsDefault="True" />
+      </StackPanel>
+      <TextBlock x:Name="VersionText" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+    </DockPanel>
   </StackPanel>
 </Window>

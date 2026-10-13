@@ -33,19 +33,46 @@ All screenshots are generated from the real application by `scripts/update-docs.
 
 ---
 
-## 1. Requirements and starting the app
+## 1. Installing and starting the app
 
-* **git** must be installed and on your `PATH` (the app runs the real `git` command, so your hooks, credential helpers and SSH config all work exactly as in a terminal).
-* To run from source you need the **.NET 10 SDK**.
+**Requirement:** [git](https://git-scm.com) must be installed and on your `PATH` (the app runs the real `git` command, so your hooks, credential helpers and SSH config all work exactly as in a terminal). If git lives elsewhere, set its path in [Settings](#17-settings-dialog-and-stored-data).
+
+Download the package for your system from the project's **Releases** page (each release also lists `SHA256SUMS` so you can verify the download with `sha256sum -c SHA256SUMS`). Everything is self-contained: you do **not** need to install .NET.
+
+### Linux
+
+| Package | Install |
+|---|---|
+| `git-cross_<version>_amd64.deb` / `_arm64.deb` (Debian, Ubuntu, Mint…) | `sudo apt install ./git-cross_<version>_amd64.deb` — adds a menu entry and the `git-cross` command. Remove with `sudo apt remove git-cross`. |
+| `git-cross-<version>-linux-x64.tar.gz` / `linux-arm64` (any distribution) | Extract, then run `./install.sh` for a per-user install (menu entry + `git-cross` in `~/.local/bin`), or just run `./git-cross` directly. Uninstall by deleting `~/.local/opt/git-cross`, `~/.local/bin/git-cross` and the `.desktop` file in `~/.local/share/applications`. |
+
+### Windows
+
+Download `git-cross-<version>-win-x64.zip`, extract it anywhere and double-click `git-cross.exe` (there is no installer; delete the folder to uninstall). Because the build is not code-signed, Windows SmartScreen may say "Windows protected your PC": click **More info → Run anyway**.
+
+### macOS
+
+Download `git-cross-<version>-osx-arm64.zip` (Apple silicon) or `-osx-x64.zip` (Intel), unzip, and drag **git-cross.app** to *Applications*. The app is not signed or notarized, so the first time use **right-click → Open → Open**; if macOS still refuses, run `xattr -dr com.apple.quarantine "/Applications/git-cross.app"` once.
+
+### Starting it
+
+Launch it from your menu/Applications/Start folder, or from a terminal. It opens the repository given on the command line; otherwise it reopens the **last repository you used**; if there is none, it shows the welcome screen.
 
 ```bash
-dotnet run --project src/GitCross.App                 # reopens your last repository
-dotnet run --project src/GitCross.App -- /path/to/repo   # opens a specific repository
+git-cross                 # reopens your last repository (Linux package)
+git-cross /path/to/repo   # opens a specific repository
 ```
 
-Release builds (`scripts/publish.sh`) are self-contained single files for `linux-x64`, `osx-arm64` and `win-x64`.
+The version is shown at the bottom-left of the **⚙ Settings** dialog.
 
-When the app starts it opens the repository given on the command line; otherwise it reopens the **last repository you used**; if there is none, it shows the welcome screen.
+### Building from source
+
+You need the **.NET 10 SDK**.
+
+```bash
+dotnet run --project src/GitCross.App -- /path/to/repo   # run from source
+scripts/package.sh                                     # build all release packages
+```
 
 ## 2. The welcome screen: open, clone, init
 

@@ -20,6 +20,7 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         _settings = settings;
+        VersionText.Text = $"{AppInfo.Name} {AppInfo.Version}";
         GitPathBox.Text = settings.GitExecutable;
         PullRebaseBox.IsChecked = settings.PullRebase;
         MaxCommitsBox.ItemsSource = AppSettings.MaxCommitsChoices;

@@ -1,0 +1,26 @@
+name: Release
+# Push a tag such as v0.2.0 (after bumping <Version> in Directory.Build.props) to publish packages for every OS.
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest   # every target is cross-published from Linux; macOS/Windows packages are just archives
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { global-json-file: global.json }
+      - name: Tag must match the project version
+        run: |
+          v="v$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)"
+          test "$v" = "$GITHUB_REF_NAME" || { echo "Tag $GITHUB_REF_NAME does not match $v in Directory.Build.props"; exit 1; }
+      - name: Core tests
+        run: dotnet test tests/GitCross.Core.Tests -c Release
+      - name: Package
+        run: scripts/package.sh
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/packages/*
+          generate_release_notes: true

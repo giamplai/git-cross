@@ -27,3 +27,4 @@
 | Plugins | Todo | design a cross-platform extension API |
 | Shell integration (context menu) | Todo | per-OS: Nautilus/Dolphin, Finder, Explorer |
 | Localization | Todo | reuse upstream .xlf translations |
+| Packaging (deb, tar.gz, zip, macOS .app) + release workflow | Done | unsigned; no MSI/dmg/AppImage yet |
