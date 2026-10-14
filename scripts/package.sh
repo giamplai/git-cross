@@ -51,23 +51,28 @@ EOS
       cp packaging/linux/git-cross.desktop "$deb/usr/share/applications/"
       doc="$deb/usr/share/doc/git-cross"; mkdir -p "$doc"
       cp NOTICE.md THIRD-PARTY-NOTICES.md "$doc/"
-      cat > "$doc/copyright" <<'EOC'
+      {
+        cat <<'EOC'
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: git-cross
-Source: https://github.com/gitextensions/gitextensions (inspiration only; no upstream code is included - see NOTICE.md)
+Upstream-Contact: Giampiero Lai <giampiero.lai@gmail.com>
+Source: https://github.com/giamplai/git-cross
+Comment: Inspired by Git Extensions (https://github.com/gitextensions/gitextensions); no code from that project is
+ included - see NOTICE.md. The single-file executable bundles the .NET runtime, Avalonia, SkiaSharp, HarfBuzzSharp and
+ the Inter font; their notices and license texts are in THIRD-PARTY-NOTICES.md.
 
 Files: *
-Copyright: git-cross contributors
-License: GPL-3
- On Debian systems the complete text of the GNU General Public License
- version 3 can be found in /usr/share/common-licenses/GPL-3.
+Copyright: 2026 Giampiero Lai
+License: Expat
 
 Files: opt/git-cross/git-cross
-Copyright: see THIRD-PARTY-NOTICES.md in this directory
-Comment: the single-file executable bundles the .NET runtime, Avalonia, SkiaSharp, HarfBuzzSharp and the Inter font
- (MIT, BSD-3-Clause, SIL OFL 1.1). Their notices and license texts are reproduced in THIRD-PARTY-NOTICES.md.
-License: MIT and BSD-3-Clause and OFL-1.1
+Copyright: 2026 Giampiero Lai and the authors listed in THIRD-PARTY-NOTICES.md
+License: Expat and BSD-3-Clause and OFL-1.1
+
+License: Expat
 EOC
+        sed -e 's/^$/ ./' -e 's/^/ /' LICENSE.md | tail -n +3
+      } > "$doc/copyright"
       # Debian policy: root dir and all dirs 0755, plain files 0644, the executable 0755
       find "$deb" -type d -exec chmod 755 {} +
       find "$deb" -type f ! -path "*/opt/*" -exec chmod 644 {} +
@@ -80,7 +85,8 @@ Priority: optional
 Architecture: $arch
 Depends: git, libfontconfig1, libx11-6
 Installed-Size: $size
-Maintainer: git-cross contributors <noreply@example.com>
+Maintainer: Giampiero Lai <giampiero.lai@gmail.com>
+Homepage: https://github.com/giamplai/git-cross
 Description: Cross-platform Git client
  A fast, native Git client with history graph, staging by hunk and line,
  interactive rebase, blame, stashes, submodules and conflict resolution.
@@ -90,7 +96,7 @@ EOC
     win-*)
       stage=$(mktemp -d)/"$base"; mkdir -p "$stage"
       cp "$pub/$NAME.exe" "$stage/"
-      printf 'git-cross %s\r\nRequires git (https://git-scm.com). Run %s.exe.\r\nLicense: GNU GPL v3 (LICENSE.md). Inspired by Git Extensions - not affiliated. See NOTICE.md and THIRD-PARTY-NOTICES.md.\r\n' "$VERSION" "$NAME" > "$stage/README.txt"
+      printf 'git-cross %s\r\nRequires git (https://git-scm.com). Run %s.exe.\r\nCopyright (c) 2026 Giampiero Lai - MIT License (LICENSE.md). Inspired by Git Extensions - not affiliated. See NOTICE.md and THIRD-PARTY-NOTICES.md.\r\n' "$VERSION" "$NAME" > "$stage/README.txt"
       cp LICENSE.md NOTICE.md THIRD-PARTY-NOTICES.md "$stage/"
       (cd "$(dirname "$stage")" && zip -qr "$OUT/$base.zip" "$base")
       ;;

@@ -554,7 +554,7 @@ Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete u
 The bottom-left corner of **⚙ Settings** shows the version, the license and a credit line.
 
 * **Credits.** git-cross is inspired by **[Git Extensions](https://github.com/gitextensions/gitextensions)**, the Windows Git client, and we thank its authors and contributors. This is an **independent implementation** — it contains none of Git Extensions' source code, translations or artwork — and it is **not affiliated with or endorsed by** that project.
-* **License.** The application is free software under the **GNU General Public License, version 3** (`LICENSE.md`). You may use, study, share and modify it under those terms; it comes with no warranty.
+* **Author and license.** Copyright (c) 2026 **Giampiero Lai** ([@giamplai](https://github.com/giamplai)). Released under the **MIT License** (`LICENSE.md`): you are free to use, copy, modify, extend and redistribute it — including commercially — as long as the copyright notice and license text are kept. It comes with no warranty.
 * **Third-party components.** The app bundles open-source libraries (Avalonia, SkiaSharp, HarfBuzzSharp, the Inter typeface and the .NET runtime) under permissive licenses. Their names, versions and license texts are in `THIRD-PARTY-NOTICES.md`.
 * **Where to find these files.** They are inside every download: next to the program in the `.tar.gz` and `.zip`, in `git-cross.app/Contents/Resources` on macOS, and in `/usr/share/doc/git-cross/` after installing the `.deb`.
 * **Your repositories** are never uploaded anywhere; the application only runs `git` locally and the optional external tools you configure.

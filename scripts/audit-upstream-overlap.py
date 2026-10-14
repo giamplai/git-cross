@@ -10,7 +10,7 @@ import os, re, sys
 
 MIN = 45
 UP = sys.argv[1] if len(sys.argv) > 1 else next(
-    (p for p in (os.path.expanduser('~/Progetti/upstream-gitextensions'), 'external/gitextensions') if os.path.isdir(p)), None)
+    (p for p in (os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'external', 'gitextensions'),) if os.path.isdir(p)), None)
 if not UP:
     sys.exit("upstream checkout not found: pass its path (scripts/fetch-upstream.sh clones it to external/gitextensions)")
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

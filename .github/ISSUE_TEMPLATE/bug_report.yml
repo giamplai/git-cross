@@ -1,0 +1,25 @@
+name: Bug report
+description: Something does not work as described
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes: { label: What happened?, description: What did you do, what did you expect, what happened instead? }
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes: { label: Steps to reproduce, placeholder: "1. Open a repository…\n2. Right-click…" }
+  - type: input
+    id: version
+    attributes: { label: App version, description: Shown at the bottom left of Settings (⚙) }
+    validations: { required: true }
+  - type: dropdown
+    id: os
+    attributes: { label: Operating system, options: [Linux, macOS, Windows] }
+    validations: { required: true }
+  - type: input
+    id: git
+    attributes: { label: Git version, placeholder: "git --version" }
+  - type: textarea
+    id: extra
+    attributes: { label: Screenshots / error text, description: "The red message in the status bar is git's own output." }
