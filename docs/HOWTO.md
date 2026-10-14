@@ -24,6 +24,7 @@ All screenshots are generated from the real application by `scripts/update-docs.
 13. [Rewriting and moving: cherry-pick, revert, reset](#13-cherry-pick-revert-reset)
 14. [Blame and file history](#14-blame-and-file-history)
 15. [Resolving conflicts](#15-resolving-conflicts)
+15b. [External merge and diff tools (e.g. Collate)](#15b-external-merge-and-diff-tools-eg-collate)
 16. [Themes](#16-themes)
 17. [Settings dialog and stored data](#17-settings-dialog-and-stored-data)
 18. [Keyboard shortcuts](#18-keyboard-shortcuts)
@@ -195,7 +196,7 @@ When a commit is selected, the right-hand pane of the History tab shows:
 2. **Commit information** – full hash, author, date and the full message (selectable text).
 3. **Changed files** – each with a badge: **A** added (green), **M** modified (amber), **D** deleted (red), **R** renamed (blue). Select a file to see its diff below. The first file is selected automatically.
 
-Right-click a file for **Blame (at this commit)** and **File history** (section 14).
+Right-click a file for **Blame (at this commit)**, **File history** (section 14) and **Open diff in external tool…** ([section 15b](#15b-external-merge-and-diff-tools-eg-collate)).
 
 ### The diff panel
 
@@ -400,11 +401,66 @@ When a merge, pull, cherry-pick, revert or rebase stops because of conflicting c
 3. Select a conflicted file: the lower panel shows the file with its conflict markers. **Red = ours** (your current branch), **green = theirs** (the incoming change). *During a rebase git swaps the two: "ours" is the branch you are rebasing onto and "theirs" is your own commit being replayed.*; blue lines are the `<<<<<<<`, `=======`, `>>>>>>>` markers.
 4. Resolve each file, either:
    * right-click → **Accept ours (current branch)** or **Accept theirs (incoming)** – takes that whole version and stages it; or
+   * right-click → **Resolve in external merge tool…** to resolve it in a real three-way merge editor such as Collate ([section 15b](#15b-external-merge-and-diff-tools-eg-collate)); or
    * right-click → **Open in default editor**, edit the file to the result you want (remove the markers), save, then click **＋** to mark it resolved.
 5. When no conflicted files remain, **Continue** becomes enabled. Click it to finish (a merge creates its merge commit with the default message; cherry-pick/revert/rebase continue to the next step).
 6. **Abort** (confirms first) abandons the operation and restores the state from before it began; resolutions made so far are lost.
 
 The banner also appears if you start such an operation in a terminal, and survives restarting the app.
+
+## 15b. External merge and diff tools (e.g. Collate)
+
+The built-in conflict view lets you take a whole side of a file. For anything finer you can hand the file to a dedicated **three-way merge tool** — and view any diff in your preferred **diff tool**. The app works with any program that can be started from a command line; **Collate** (a cross-platform compare and merge tool built with the same technology) is supported out of the box as a preset.
+
+### Setting it up
+
+1. Open **⚙ Settings → External tools** (screenshot in [section 17](#17-settings-dialog-and-stored-data)).
+2. Choose a **Preset** — Collate, Meld, KDiff3 or VS Code — or type your own command in **Merge tool** / **Diff tool**.
+3. Check the line under each box: **✓ Found …** means the program was located on your `PATH` (hover for the full path); **✗ … was not found** means you need to install it or give a full path.
+4. Press **Save**. Leaving both boxes empty keeps only the built-in resolution.
+
+If nothing is configured but Collate is installed, Settings tells you so and the Collate preset is one click away.
+
+### Writing your own command
+
+The command is split into a program and its arguments and started **directly, without a shell**, so file names with spaces or special characters are always safe. Use quotes to group words. These variables are replaced with file paths:
+
+| Variable | Meaning | Available in |
+|---|---|---|
+| `$LOCAL` | your side — "ours", the current branch (or the old version in a diff) | merge, diff |
+| `$REMOTE` | the incoming side — "theirs" (or the new version in a diff) | merge, diff |
+| `$BASE` | the common ancestor (an empty file if the file was added on both sides) | merge |
+| `$MERGED` | where the tool must write the result | merge |
+
+A variable the app does not know (for example a typo like `$MERGE`) is flagged in red and the settings are not saved.
+
+Example for Collate:
+```text
+collate --merge --base "$BASE" --left "$LOCAL" --right "$REMOTE" --output "$MERGED"
+```
+
+### Resolving a conflict with the tool
+
+1. When a merge, pull, cherry-pick or rebase stops with conflicts, open the **Commit** tab.
+2. Right-click the conflicted file (**!** badge) → **Resolve in external merge tool…**.
+3. The status bar says it is waiting for the tool. Resolve every difference, **save** and close the tool.
+4. If the tool reports success, its result replaces the file in your working tree and is staged automatically; the conflicted-files counter in the yellow banner goes down. When it reaches zero, click **Continue**.
+
+**Safe by design:** the tool writes to a temporary file. Your working file is only replaced when the tool exits successfully *and* produced a result. If you close the tool without saving, or it cannot resolve everything, the file stays conflicted exactly as it was and the status bar tells you so — nothing is lost and you can try again or use *Accept ours / theirs*.
+
+The tool cannot be used when one side **deleted** the file (there is nothing to merge); the message says so — use **Accept ours** (keep the file) or **Accept theirs** (accept the deletion).
+
+### Viewing a diff in the tool
+
+Right-click a file and choose **Open diff in external tool…**:
+
+| Where | What is compared |
+|---|---|
+| A file in a commit's file list (History tab) | the file before and after that commit |
+| *Unstaged changes* | the staged (or last committed) version against your working file |
+| *Staged changes* | the last commit against the staged version |
+
+The diff tool receives the two versions as `$LOCAL` (old) and `$REMOTE` (new) temporary files; they are removed when you close it.
 
 ## 16. Themes
 
@@ -424,6 +480,7 @@ Click **⚙** in the toolbar. Changes apply when you press **Save** (**Esc**/Can
 |---|---|
 | **Git executable** | Leave empty to use `git` from your `PATH`. Set a full path to use a specific installation (for example a newer git, or Git for Windows in a custom folder). **Test** runs `git --version` and shows the result in green (✓) or an error (✗); **Browse…** lets you pick the file. Saving is refused while the path cannot be started. |
 | **Identity — Name / Email** | Your *global* git `user.name` and `user.email` (stored in your `~/.gitconfig`), used as the author of new commits. Clearing a field removes that key. A repository's own local config, if set, still takes precedence. |
+| **Preset / Merge tool / Diff tool** | An external program for three-way merges and for viewing diffs ([section 15b](#15b-external-merge-and-diff-tools-eg-collate)). Pick a preset (Collate, Meld, KDiff3, VS Code) or write your own command. A green ✓ means the program was found; a red message says why not. |
 | **Pull with rebase** | Makes the toolbar **Pull** button rebase instead of merge. (The Pull **▾** menu can always choose explicitly.) |
 | **Commits loaded in History** | 500, 1000, 2000 (default), 5000 or 10000. Lower it for a faster view of huge repositories; raise it to see further back. |
 
@@ -475,12 +532,15 @@ Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete u
 | Checkout refused | You have uncommitted changes that would be overwritten: stash or commit them. |
 | Settings misbehave | Delete the settings file (section 17). |
 | Wrong or missing author on commits | Set your name and email in **⚙ Settings → Identity**. |
+| A merge/diff tool does nothing, or "Could not start …" | The program is not installed or not on your `PATH`: check the status line under the command in Settings, or give a full path. |
+| "The merge tool was closed without saving…" | The tool exited without success. Save the result in the tool before closing; the file is still conflicted and nothing was changed. |
 | "git executable cannot be started" | Clear the path to use `git` from PATH, or install git and use **Browse…** to select it. |
 
 ## 21. Known limitations
 
 * Interactive rebase supports pick, reword, squash, fixup, drop and reordering; the `edit` and `exec` todo commands, and rebasing merge commits, are not available. A rebase started elsewhere is recognized and can be continued or aborted.
-* Conflicts are resolved per file (take a side, or edit in your editor); there is no built-in three-way merge editor.
+* Conflicts are resolved per file: take a side, edit in your editor, or use an **external** three-way merge tool such as Collate. There is no merge editor built into this window.
+* Comparing two folders (for example two commits or branches) in an external tool is not available yet; only single-file diffs are.
 * Staging works per file, per hunk and per selected line (unified view only; not for untracked files).
 * Diffs highlight changes but have no language syntax coloring yet. In side-by-side mode lines are paired by position, so when a block changes many lines the pairs can look offset.
 * The history view loads a limited number of commits (2000 by default; see Settings).

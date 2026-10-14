@@ -580,6 +580,14 @@ public class WindowRenderTests
         var cfg = Path.Combine(Path.GetTempPath(), "gxc-fakecfg-" + Guid.NewGuid().ToString("N")[..8]);
         File.WriteAllText(cfg, "[user]\n\tname = Ada Lovelace\n\temail = ada@example.com\n");
         var old = Environment.GetEnvironmentVariable("GIT_CONFIG_GLOBAL");
+        var oldPath = Environment.GetEnvironmentVariable("PATH");
+        // a stand-in "collate" on PATH so the tool status is deterministic and never shows a developer's real install
+        var bin = Path.Combine(Path.GetTempPath(), "gxc-bin-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(bin);
+        var fake = Path.Combine(bin, OperatingSystem.IsWindows() ? "collate.exe" : "collate");
+        File.WriteAllText(fake, "#!/bin/sh\nexit 0\n");
+        if (!OperatingSystem.IsWindows()) { File.SetUnixFileMode(fake, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute); }
+        Environment.SetEnvironmentVariable("PATH", bin + Path.PathSeparator + oldPath);
         Environment.SetEnvironmentVariable("GIT_CONFIG_GLOBAL", cfg);
         try
         {
@@ -590,14 +598,80 @@ public class WindowRenderTests
             Assert.Equal("Ada Lovelace", dlg.FindControl<TextBox>("NameBox")!.Text);
             Assert.StartsWith("✓ git version", dlg.FindControl<TextBlock>("GitStatusText")!.Text);
             Assert.Matches(@"^git-cross \d+\.\d+\.\d+", dlg.FindControl<TextBlock>("VersionText")!.Text);
+            Assert.Contains("Collate was found", dlg.FindControl<TextBlock>("MergeStatus")!.Text); // nothing configured yet: hint only
+
+            dlg.FindControl<ComboBox>("PresetBox")!.SelectedIndex = 1; // Collate
+            await Settle();
+            Assert.Contains("--merge", dlg.FindControl<TextBox>("MergeBox")!.Text);
+            Assert.Equal("collate \"$LOCAL\" \"$REMOTE\"", dlg.FindControl<TextBox>("DiffBox")!.Text);
+            Assert.Equal("✓ Found " + Path.GetFileName(fake), dlg.FindControl<TextBlock>("MergeStatus")!.Text);
+
+            dlg.FindControl<TextBox>("MergeBox")!.Text = "collate $MERGE";
+            await Settle();
+            Assert.Contains("Unknown variable $MERGE", dlg.FindControl<TextBlock>("MergeStatus")!.Text);
+            dlg.FindControl<TextBox>("MergeBox")!.Text = "no-such-tool-xyz $MERGED";
+            await Settle();
+            Assert.Contains("was not found", dlg.FindControl<TextBlock>("MergeStatus")!.Text);
+
+            dlg.FindControl<ComboBox>("PresetBox")!.SelectedIndex = 0;
+            dlg.FindControl<ComboBox>("PresetBox")!.SelectedIndex = 1;
+            await Settle();
             Shot(dlg, "settings-dialog.png");
             dlg.Close();
         }
         finally
         {
             Environment.SetEnvironmentVariable("GIT_CONFIG_GLOBAL", old);
+            Environment.SetEnvironmentVariable("PATH", oldPath);
+            Directory.Delete(bin, true);
             File.Delete(cfg);
         }
+    }
+
+    [AvaloniaFact]
+    public async Task Conflict_can_be_resolved_with_the_configured_merge_tool()
+    {
+        if (OperatingSystem.IsWindows()) { return; }
+        var repo = NewRepo();
+        File.WriteAllText(Path.Combine(repo, "f.txt"), "base\n");
+        Git(repo, "add ."); Git(repo, "commit -qm base");
+        Git(repo, "checkout -qb topic");
+        File.WriteAllText(Path.Combine(repo, "f.txt"), "topic\n"); Git(repo, "commit -qam topic");
+        Git(repo, "checkout -q main");
+        File.WriteAllText(Path.Combine(repo, "f.txt"), "main\n"); Git(repo, "commit -qam main");
+        Git(repo, "merge topic -q");   // conflicts; Git() ignores the exit code
+
+        var vm = new MainViewModel(new SettingsStore(Path.Combine(repo, "..", "gxc-s-" + Guid.NewGuid() + ".json")));
+        var w = new MainWindow(vm);
+        w.Show();
+        await vm.OpenAsync(repo);
+        await Settle();
+        var file = vm.Unstaged.Single(f => f.IsConflicted);
+        Assert.Equal(1, vm.ConflictCount);
+
+        // no tool configured: a clear instruction, nothing changes
+        await vm.ResolveInToolAsync(file);
+        Assert.True(vm.IsError);
+        Assert.Contains("Settings", vm.StatusText);
+        Assert.Equal(1, vm.ConflictCount);
+
+        // a tool that gives up leaves the conflict and explains
+        vm.Settings.MergeTool = "sh -c 'exit 3'";
+        await vm.ResolveInToolAsync(file);
+        Assert.True(vm.IsError);
+        Assert.Contains("still conflicted", vm.StatusText);
+        Assert.Equal(1, vm.ConflictCount);
+
+        // a tool that writes the merged result resolves it and the banner offers Continue
+        vm.Settings.MergeTool = "sh -c 'printf \"merged by tool\\n\" > \"$1\"' _ $MERGED";
+        await vm.ResolveInToolAsync(file);
+        Assert.False(vm.IsError, vm.StatusText);
+        Assert.Equal(0, vm.ConflictCount);
+        Assert.True(vm.CanContinue);
+        Assert.Equal("merged by tool\n", File.ReadAllText(Path.Combine(repo, "f.txt")).Replace("\r\n", "\n"));
+
+        await vm.ContinueOperationCommand.ExecuteAsync(null);
+        Assert.False(vm.HasOperation);
     }
 
     [AvaloniaFact]

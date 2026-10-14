@@ -19,11 +19,10 @@
 | Merge (default, no-ff, squash) | Done | sidebar context menu |
 | Rebase onto branch, pull --rebase | Done | |
 | Interactive rebase (pick/reword/squash/fixup/drop, reorder) | Done | edit/exec/merges not supported |
-| Conflict resolution | Done | banner, marker view, accept ours/theirs, continue/abort for merge, cherry-pick, revert, rebase; no 3-way merge editor yet |
+| Conflict resolution | Done | banner, marker view, accept ours/theirs, continue/abort; 3-way merge via external tool |
+| External merge/diff tools (Collate, Meld, KDiff3, VS Code, custom) | Done | command templates, no shell; folder compare of commits Todo |
 | Blame / file history | Done | right-click a file: blame (at commit or work tree), file history with renames; double-click blame line jumps to commit |
 | Submodules (list, init/update, open, clone recursive) | Done | add/remove/set-url not in UI |
-| Interactive rebase | Todo | |
-| Search/filter commits | Todo | |
 | Plugins | Todo | design a cross-platform extension API |
 | Shell integration (context menu) | Todo | per-OS: Nautilus/Dolphin, Finder, Explorer |
 | Localization | Todo | reuse upstream .xlf translations |

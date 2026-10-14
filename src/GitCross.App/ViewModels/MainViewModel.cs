@@ -10,6 +10,7 @@ using GitCross.Core.Models;
 using GitCross.Core.Rebase;
 using GitCross.Core.Settings;
 using GitCross.Core.Submodules;
+using GitCross.Core.Tools;
 using GitCross.Core.Util;
 
 namespace GitCross.App.ViewModels;
@@ -813,6 +814,72 @@ public partial class MainViewModel : ObservableObject
             Amend = false;
             SelectedTab = 0;
         }
+    }
+
+    private static string ToolName(string template)
+        => Path.GetFileNameWithoutExtension(CommandTemplate.Split(template).FirstOrDefault() ?? "the tool");
+
+    /// <summary>Hands a conflicted file to the configured external merge tool; the app stages the result only if the tool reports success.</summary>
+    public async Task ResolveInToolAsync(FileChange f)
+    {
+        if (_repo is not { } repo)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_settings.MergeTool))
+        {
+            Fail("No merge tool is configured. Open ⚙ Settings → External tools (the Collate preset is one click).");
+            return;
+        }
+
+        var template = _settings.MergeTool!;
+        await Guard(async () =>
+        {
+            StatusText = $"Waiting for {ToolName(template)}… save and close it to return.";
+            var outcome = await repo.ResolveWithToolAsync(f.Path, template);
+            await RefreshAsync();
+            if (outcome.Success)
+            {
+                StatusText = $"Resolved {f.Path} with {ToolName(template)}.";
+            }
+            else
+            {
+                Fail(outcome.Message ?? "The merge tool did not resolve the file.");
+            }
+        });
+    }
+
+    /// <summary>Opens one file's old/new versions in the configured external diff tool.</summary>
+    public async Task DiffInToolAsync(FileChange f, GitRepository.DiffTarget target)
+    {
+        if (_repo is not { } repo)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_settings.DiffTool))
+        {
+            Fail("No diff tool is configured. Open ⚙ Settings → External tools.");
+            return;
+        }
+
+        var template = _settings.DiffTool!;
+        var sha = target == GitRepository.DiffTarget.Commit ? _detailSha : null;
+        await Guard(async () =>
+        {
+            StatusText = $"Waiting for {ToolName(template)}…";
+            var outcome = await repo.DiffWithToolAsync(f.Path, target, sha, template);
+            if (outcome.Success)
+            {
+                IsError = false;
+                StatusText = $"Closed {ToolName(template)}.";
+            }
+            else
+            {
+                Fail(outcome.Message ?? "The diff tool could not be started.");
+            }
+        });
     }
 
     public Task ResolveAsync(FileChange f, bool ours) => Mutate(() => _repo!.ResolveAsync(f.Path, ours), f);

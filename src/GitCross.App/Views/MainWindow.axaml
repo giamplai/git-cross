@@ -232,6 +232,8 @@
                               <ContextMenu>
                                 <MenuItem Header="Blame (at this commit)" Click="OnBlameCommitFile" />
                                 <MenuItem Header="File history" Click="OnFileHistory" />
+                                <Separator />
+                                <MenuItem Header="Open diff in external tool…" Click="OnDiffCommitInTool" />
                               </ContextMenu>
                             </StackPanel.ContextMenu>
                             <Border Classes="kind" Background="{Binding Kind, Converter={x:Static c:Converters.ChangeBrush}}"><TextBlock Text="{Binding Kind, Converter={x:Static c:Converters.ChangeLetter}}" /></Border>
@@ -258,9 +260,11 @@
                           <DockPanel Background="Transparent">
                             <DockPanel.ContextMenu>
                               <ContextMenu>
+                                <MenuItem Header="Resolve in external merge tool…" Click="OnResolveInTool" IsVisible="{Binding IsConflicted}" />
                                 <MenuItem Header="Accept ours (current branch)" Click="OnAcceptOurs" IsVisible="{Binding IsConflicted}" />
                                 <MenuItem Header="Accept theirs (incoming)" Click="OnAcceptTheirs" IsVisible="{Binding IsConflicted}" />
                                 <MenuItem Header="Open in default editor" Click="OnOpenFile" />
+                                <MenuItem Header="Open diff in external tool…" Click="OnDiffUnstagedInTool" />
                                 <Separator />
                                 <MenuItem Header="Blame" Click="OnBlameWorkFile" />
                                 <MenuItem Header="File history" Click="OnFileHistory" />
@@ -288,9 +292,11 @@
                           <DockPanel Background="Transparent">
                             <DockPanel.ContextMenu>
                               <ContextMenu>
+                                <MenuItem Header="Resolve in external merge tool…" Click="OnResolveInTool" IsVisible="{Binding IsConflicted}" />
                                 <MenuItem Header="Accept ours (current branch)" Click="OnAcceptOurs" IsVisible="{Binding IsConflicted}" />
                                 <MenuItem Header="Accept theirs (incoming)" Click="OnAcceptTheirs" IsVisible="{Binding IsConflicted}" />
                                 <MenuItem Header="Open in default editor" Click="OnOpenFile" />
+                                <MenuItem Header="Open diff in external tool…" Click="OnDiffStagedInTool" />
                                 <Separator />
                                 <MenuItem Header="Blame" Click="OnBlameWorkFile" />
                                 <MenuItem Header="File history" Click="OnFileHistory" />

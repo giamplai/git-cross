@@ -284,6 +284,26 @@ public partial class MainWindow : Window
 
     private static Core.Models.FileChange? FileOf(object? sender) => (sender as Control)?.DataContext as Core.Models.FileChange;
 
+    private async void OnResolveInTool(object? s, RoutedEventArgs e)
+    {
+        if (FileOf(s) is { } f) { await _vm.ResolveInToolAsync(f); }
+    }
+
+    private async void OnDiffUnstagedInTool(object? s, RoutedEventArgs e)
+    {
+        if (FileOf(s) is { } f) { await _vm.DiffInToolAsync(f, GitRepository.DiffTarget.Unstaged); }
+    }
+
+    private async void OnDiffStagedInTool(object? s, RoutedEventArgs e)
+    {
+        if (FileOf(s) is { } f) { await _vm.DiffInToolAsync(f, GitRepository.DiffTarget.Staged); }
+    }
+
+    private async void OnDiffCommitInTool(object? s, RoutedEventArgs e)
+    {
+        if (FileOf(s) is { } f) { await _vm.DiffInToolAsync(f, GitRepository.DiffTarget.Commit); }
+    }
+
     private async void OnAcceptOurs(object? s, RoutedEventArgs e)
     {
         if (FileOf(s) is { } f) { await _vm.ResolveAsync(f, ours: true); }

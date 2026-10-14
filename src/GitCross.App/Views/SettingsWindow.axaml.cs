@@ -4,6 +4,7 @@ using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using GitCross.Core.Git;
 using GitCross.Core.Settings;
+using GitCross.Core.Tools;
 
 namespace GitCross.App.Views;
 
@@ -25,6 +26,25 @@ public partial class SettingsWindow : Window
         PullRebaseBox.IsChecked = settings.PullRebase;
         MaxCommitsBox.ItemsSource = AppSettings.MaxCommitsChoices;
         MaxCommitsBox.SelectedItem = AppSettings.MaxCommitsChoices.Contains(settings.MaxCommits) ? settings.MaxCommits : 2000;
+        MergeBox.Text = settings.MergeTool;
+        DiffBox.Text = settings.DiffTool;
+        var presetNames = new List<string> { "Custom" };
+        presetNames.AddRange(ExternalTool.Presets.Select(p => p.Name));
+        PresetBox.ItemsSource = presetNames;
+        PresetBox.SelectedIndex = Math.Max(0, ExternalTool.Presets.ToList().FindIndex(p => p.Merge == settings.MergeTool && p.Diff == settings.DiffTool) + 1);
+        PresetBox.SelectionChanged += (_, _) =>
+        {
+            if (PresetBox.SelectedIndex > 0)
+            {
+                var preset = ExternalTool.Presets[PresetBox.SelectedIndex - 1];
+                MergeBox.Text = preset.Merge;
+                DiffBox.Text = preset.Diff;
+            }
+        };
+        MergeBox.TextChanged += (_, _) => ShowToolStatus(MergeBox.Text, MergeStatus, "merge");
+        DiffBox.TextChanged += (_, _) => ShowToolStatus(DiffBox.Text, DiffStatus, "diff");
+        ShowToolStatus(MergeBox.Text, MergeStatus, "merge");
+        ShowToolStatus(DiffBox.Text, DiffStatus, "diff");
         KeyDown += (_, e) =>
         {
             if (e.Key == Avalonia.Input.Key.Escape)
@@ -38,6 +58,37 @@ public partial class SettingsWindow : Window
             EmailBox.Text = await GitEnvironment.GetGlobalAsync("user.email");
             await TestGitAsync();
         };
+    }
+
+    private static void ShowToolStatus(string? template, TextBlock target, string kind)
+    {
+        if (string.IsNullOrWhiteSpace(template))
+        {
+            var collate = ExternalTool.Locate("collate");
+            target.Text = collate is null ? $"No {kind} tool: only the built-in resolution is used." : $"No {kind} tool set. Collate was found on this computer: pick the Collate preset to use it.";
+            ToolTip.SetTip(target, collate);
+            target.Foreground = Brushes.Gray;
+            return;
+        }
+
+        var exe = ExternalTool.ResolveExecutable(template);
+        var unknown = CommandTemplate.UnknownVariables(template, [CommandTemplate.Base, CommandTemplate.Local, CommandTemplate.Remote, CommandTemplate.Merged]);
+        if (unknown.Count > 0)
+        {
+            target.Text = $"✗ Unknown variable {string.Join(", ", unknown)} (use $BASE, $LOCAL, $REMOTE, $MERGED).";
+            target.Foreground = Brushes.IndianRed;
+        }
+        else if (exe is null)
+        {
+            target.Text = $"✗ “{CommandTemplate.Split(template).FirstOrDefault()}” was not found on your PATH.";
+            target.Foreground = Brushes.IndianRed;
+        }
+        else
+        {
+            target.Text = $"✓ Found {Path.GetFileName(exe)}";
+            ToolTip.SetTip(target, exe);
+            target.Foreground = Brushes.SeaGreen;
+        }
     }
 
     private async Task TestGitAsync()
@@ -83,6 +134,19 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        var known = new[] { CommandTemplate.Base, CommandTemplate.Local, CommandTemplate.Remote, CommandTemplate.Merged };
+        foreach (var t in new[] { MergeBox.Text, DiffBox.Text })
+        {
+            if (!string.IsNullOrWhiteSpace(t) && CommandTemplate.UnknownVariables(t, known) is { Count: > 0 } bad)
+            {
+                ErrorText.Text = $"The tool command uses an unknown variable ({string.Join(", ", bad)}). Fix it before saving.";
+                ErrorText.IsVisible = true;
+                return;
+            }
+        }
+
+        _settings.MergeTool = string.IsNullOrWhiteSpace(MergeBox.Text) ? null : MergeBox.Text.Trim();
+        _settings.DiffTool = string.IsNullOrWhiteSpace(DiffBox.Text) ? null : DiffBox.Text.Trim();
         _settings.GitExecutable = path;
         _settings.PullRebase = PullRebaseBox.IsChecked == true;
         _settings.MaxCommits = MaxCommitsBox.SelectedItem is int n ? n : 2000;

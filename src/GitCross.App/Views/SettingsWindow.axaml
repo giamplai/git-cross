@@ -27,6 +27,24 @@
       <TextBlock Text="Used for the author of your commits in every repository (unless a repository overrides it)." Classes="muted" FontSize="12" TextWrapping="Wrap" />
     </StackPanel>
 
+    <StackPanel Spacing="6">
+      <TextBlock Text="EXTERNAL TOOLS" Classes="section" />
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Left" Text="Preset" Width="90" VerticalAlignment="Center" />
+        <ComboBox x:Name="PresetBox" Width="180" />
+      </DockPanel>
+      <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
+        <TextBlock Text="Merge tool" VerticalAlignment="Center" />
+        <TextBox x:Name="MergeBox" Grid.Column="1" PlaceholderText="command using $BASE $LOCAL $REMOTE $MERGED" />
+        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="MergeStatus" FontSize="12" />
+        <TextBlock Grid.Row="2" Text="Diff tool" VerticalAlignment="Center" />
+        <TextBox x:Name="DiffBox" Grid.Row="2" Grid.Column="1" PlaceholderText="command using $LOCAL $REMOTE" />
+        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="DiffStatus" FontSize="12" />
+      </Grid>
+      <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                 Text="Used from the right-click menu of conflicted and changed files. The command is run without a shell; $LOCAL is your side (ours), $REMOTE the incoming side (theirs)." />
+    </StackPanel>
+
     <StackPanel Spacing="8">
       <TextBlock Text="BEHAVIOR" Classes="section" />
       <CheckBox x:Name="PullRebaseBox" Content="Pull with rebase (the Pull button replays local commits instead of merging)" />
