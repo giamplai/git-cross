@@ -9,7 +9,7 @@ jobs:
   release:
     runs-on: ubuntu-latest   # every target is cross-published from Linux; macOS/Windows packages are just archives
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with: { global-json-file: global.json }
       - name: Tag must match the project version
