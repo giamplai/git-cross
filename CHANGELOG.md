@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-* External merge and diff tools: presets for Collate, Meld, KDiff3 and VS Code or a custom command; resolve conflicts and open diffs from the file context menus.
+* External merge and diff tools: presets for Collaterale (formerly Collate), Meld, KDiff3 and VS Code or a custom command; resolve conflicts and open diffs from the file context menus.
 
 ## 0.1.0 — first release
 * History graph with branch/tag chips, search, blame and per-file history.

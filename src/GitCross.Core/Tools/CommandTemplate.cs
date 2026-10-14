@@ -3,7 +3,7 @@ using System.Text;
 namespace GitCross.Core.Tools;
 
 /// <summary>
-/// A user-editable command line such as <c>collate --merge --base "$BASE" --left "$LOCAL" --right "$REMOTE" --output "$MERGED"</c>.
+/// A user-editable command line such as <c>collaterale --merge --base "$BASE" --left "$LOCAL" --right "$REMOTE" --output "$MERGED"</c>.
 /// It is split into an executable and arguments and run WITHOUT a shell, so paths with spaces or special characters
 /// can never be reinterpreted. Variables are substituted after splitting.
 /// </summary>

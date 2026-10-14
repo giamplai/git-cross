@@ -581,10 +581,10 @@ public class WindowRenderTests
         File.WriteAllText(cfg, "[user]\n\tname = Ada Lovelace\n\temail = ada@example.com\n");
         var old = Environment.GetEnvironmentVariable("GIT_CONFIG_GLOBAL");
         var oldPath = Environment.GetEnvironmentVariable("PATH");
-        // a stand-in "collate" on PATH so the tool status is deterministic and never shows a developer's real install
+        // a stand-in "collaterale" on PATH so the tool status is deterministic and never shows a developer's real install
         var bin = Path.Combine(Path.GetTempPath(), "gxc-bin-" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(bin);
-        var fake = Path.Combine(bin, OperatingSystem.IsWindows() ? "collate.exe" : "collate");
+        var fake = Path.Combine(bin, OperatingSystem.IsWindows() ? "collaterale.exe" : "collaterale");
         File.WriteAllText(fake, "#!/bin/sh\nexit 0\n");
         if (!OperatingSystem.IsWindows()) { File.SetUnixFileMode(fake, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute); }
         Environment.SetEnvironmentVariable("PATH", bin + Path.PathSeparator + oldPath);
@@ -598,15 +598,15 @@ public class WindowRenderTests
             Assert.Equal("Ada Lovelace", dlg.FindControl<TextBox>("NameBox")!.Text);
             Assert.StartsWith("✓ git version", dlg.FindControl<TextBlock>("GitStatusText")!.Text);
             Assert.Matches(@"^git-cross \d+\.\d+\.\d+", dlg.FindControl<TextBlock>("VersionText")!.Text);
-            Assert.Contains("Collate was found", dlg.FindControl<TextBlock>("MergeStatus")!.Text); // nothing configured yet: hint only
+            Assert.Contains("Collaterale was found", dlg.FindControl<TextBlock>("MergeStatus")!.Text); // nothing configured yet: hint only
 
-            dlg.FindControl<ComboBox>("PresetBox")!.SelectedIndex = 1; // Collate
+            dlg.FindControl<ComboBox>("PresetBox")!.SelectedIndex = 1; // Collaterale
             await Settle();
             Assert.Contains("--merge", dlg.FindControl<TextBox>("MergeBox")!.Text);
-            Assert.Equal("collate \"$LOCAL\" \"$REMOTE\"", dlg.FindControl<TextBox>("DiffBox")!.Text);
+            Assert.Equal("collaterale \"$LOCAL\" \"$REMOTE\"", dlg.FindControl<TextBox>("DiffBox")!.Text);
             Assert.Equal("✓ Found " + Path.GetFileName(fake), dlg.FindControl<TextBlock>("MergeStatus")!.Text);
 
-            dlg.FindControl<TextBox>("MergeBox")!.Text = "collate $MERGE";
+            dlg.FindControl<TextBox>("MergeBox")!.Text = "collaterale $MERGE";
             await Settle();
             Assert.Contains("Unknown variable $MERGE", dlg.FindControl<TextBlock>("MergeStatus")!.Text);
             dlg.FindControl<TextBox>("MergeBox")!.Text = "no-such-tool-xyz $MERGED";

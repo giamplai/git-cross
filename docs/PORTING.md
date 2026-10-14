@@ -20,7 +20,7 @@
 | Rebase onto branch, pull --rebase | Done | |
 | Interactive rebase (pick/reword/squash/fixup/drop, reorder) | Done | edit/exec/merges not supported |
 | Conflict resolution | Done | banner, marker view, accept ours/theirs, continue/abort; 3-way merge via external tool |
-| External merge/diff tools (Collate, Meld, KDiff3, VS Code, custom) | Done | command templates, no shell; folder compare of commits Todo |
+| External merge/diff tools (Collaterale, Meld, KDiff3, VS Code, custom) | Done | command templates, no shell; folder compare of commits Todo |
 | Blame / file history | Done | right-click a file: blame (at commit or work tree), file history with renames; double-click blame line jumps to commit |
 | Submodules (list, init/update, open, clone recursive) | Done | add/remove/set-url not in UI |
 | Plugins | Todo | design a cross-platform extension API |

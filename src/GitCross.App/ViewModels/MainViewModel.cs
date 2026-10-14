@@ -829,7 +829,7 @@ public partial class MainViewModel : ObservableObject
 
         if (string.IsNullOrWhiteSpace(_settings.MergeTool))
         {
-            Fail("No merge tool is configured. Open ⚙ Settings → External tools (the Collate preset is one click).");
+            Fail("No merge tool is configured. Open ⚙ Settings → External tools (the Collaterale preset is one click).");
             return;
         }
 

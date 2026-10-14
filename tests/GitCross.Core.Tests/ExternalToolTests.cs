@@ -11,8 +11,8 @@ public class ExternalToolTests
     [Fact]
     public void Split_groups_quotes_and_keeps_windows_backslashes()
     {
-        Assert.Equal(["collate", "--merge", "--base", "$BASE", "C:\\Program Files\\x.exe"],
-            CommandTemplate.Split("collate --merge --base \"$BASE\" 'C:\\Program Files\\x.exe'"));
+        Assert.Equal(["collaterale", "--merge", "--base", "$BASE", "C:\\Program Files\\x.exe"],
+            CommandTemplate.Split("collaterale --merge --base \"$BASE\" 'C:\\Program Files\\x.exe'"));
         Assert.Equal(["a", "", "b"], CommandTemplate.Split("a \"\" b"));
         Assert.Empty(CommandTemplate.Split("   "));
     }
@@ -180,15 +180,33 @@ public class ExternalToolTests
     }
 }
 
-/// <summary>Runs against the real Collate when it can be found (env COLLATE_BIN, or a sibling checkout's publish folder); otherwise a no-op.</summary>
-public class CollateIntegrationTests
+/// <summary>Runs against the real Collaterale when it is installed (found on PATH, or env COLLATERALE_BIN); otherwise a no-op.</summary>
+public class CollateraleIntegrationTests
 {
-    private static string? Collate()
+    private static string? Collaterale()
     {
-        var env = Environment.GetEnvironmentVariable("COLLATE_BIN");
-        if (!string.IsNullOrEmpty(env) && File.Exists(env)) { return env; }
-        var sibling = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Progetti", "Collate", "artifacts", "publish", "linux-x64", "Collate");
-        return OperatingSystem.IsLinux() && File.Exists(sibling) ? sibling : null;
+        var env = Environment.GetEnvironmentVariable("COLLATERALE_BIN");
+        return !string.IsNullOrEmpty(env) && File.Exists(env) ? env : ExternalTool.LocateCollaterale();
+    }
+
+    [Fact]
+    public void Locate_prefers_the_new_command_name_over_the_legacy_one()
+    {
+        var bin = Path.Combine(Path.GetTempPath(), "gxc-loc-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(bin);
+        try
+        {
+            foreach (var n in new[] { "collate", "collaterale" }) { File.WriteAllText(Path.Combine(bin, n), ""); }
+            Assert.Equal(Path.Combine(bin, "collaterale"), ExternalTool.LocateCollaterale(bin));
+            File.Delete(Path.Combine(bin, "collaterale"));
+            Assert.Equal(Path.Combine(bin, "collate"), ExternalTool.LocateCollaterale(bin));
+            File.Delete(Path.Combine(bin, "collate"));
+            Assert.Null(ExternalTool.LocateCollaterale(bin));
+        }
+        finally
+        {
+            Directory.Delete(bin, true);
+        }
     }
 
     private static string Template(string exe)
@@ -197,8 +215,8 @@ public class CollateIntegrationTests
     [Fact]
     public async Task Template_shape_works_with_the_real_tool_and_exit_zero_means_merged()
     {
-        if (Collate() is not { } exe) { return; }
-        var dir = Path.Combine(Path.GetTempPath(), "gxc-collate-" + Guid.NewGuid().ToString("N")[..8]);
+        if (Collaterale() is not { } exe) { return; }
+        var dir = Path.Combine(Path.GetTempPath(), "gxc-collaterale-" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(dir);
         try
         {
@@ -221,9 +239,9 @@ public class CollateIntegrationTests
     }
 
     [Fact]
-    public async Task Collate_that_finds_a_real_conflict_leaves_the_file_for_the_user()
+    public async Task Collaterale_that_finds_a_real_conflict_leaves_the_file_for_the_user()
     {
-        if (Collate() is not { } exe) { return; }
+        if (Collaterale() is not { } exe) { return; }
         var (t, r) = await TempRepo.CreateAsync();
         using (t)
         {

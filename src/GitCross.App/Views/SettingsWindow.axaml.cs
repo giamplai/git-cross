@@ -64,9 +64,9 @@ public partial class SettingsWindow : Window
     {
         if (string.IsNullOrWhiteSpace(template))
         {
-            var collate = ExternalTool.Locate("collate");
-            target.Text = collate is null ? $"No {kind} tool: only the built-in resolution is used." : $"No {kind} tool set. Collate was found on this computer: pick the Collate preset to use it.";
-            ToolTip.SetTip(target, collate);
+            var found = ExternalTool.LocateCollaterale();
+            target.Text = found is null ? $"No {kind} tool: only the built-in resolution is used." : $"No {kind} tool set. Collaterale was found on this computer: pick the Collaterale preset to use it.";
+            ToolTip.SetTip(target, found);
             target.Foreground = Brushes.Gray;
             return;
         }

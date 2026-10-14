@@ -14,19 +14,29 @@ public static class ExternalTool
     /// <summary>Ready-made merge/diff templates offered in Settings.</summary>
     public static IReadOnlyList<(string Name, string Merge, string Diff)> Presets { get; } =
     [
-        ("Collate", "collate --merge --base \"$BASE\" --left \"$LOCAL\" --right \"$REMOTE\" --output \"$MERGED\"", "collate \"$LOCAL\" \"$REMOTE\""),
+        ("Collaterale", "collaterale --merge --base \"$BASE\" --left \"$LOCAL\" --right \"$REMOTE\" --output \"$MERGED\"", "collaterale \"$LOCAL\" \"$REMOTE\""),
         ("Meld", "meld --output \"$MERGED\" \"$LOCAL\" \"$BASE\" \"$REMOTE\"", "meld \"$LOCAL\" \"$REMOTE\""),
         ("KDiff3", "kdiff3 \"$BASE\" \"$LOCAL\" \"$REMOTE\" -o \"$MERGED\"", "kdiff3 \"$LOCAL\" \"$REMOTE\""),
         ("VS Code", "code --wait --merge \"$LOCAL\" \"$REMOTE\" \"$BASE\" \"$MERGED\"", "code --wait --diff \"$LOCAL\" \"$REMOTE\""),
     ];
 
     /// <summary>Finds an executable by name on PATH (and the usual install folders). Null when absent.</summary>
-    public static string? Locate(string name)
+    public static string? Locate(string name, string? searchPath = null)
     {
         var exts = OperatingSystem.IsWindows() ? new[] { ".exe", ".cmd", ".bat", "" } : [""];
-        var dirs = new List<string>((Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries));
+        var dirs = new List<string>((searchPath ?? Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries));
+        if (searchPath is not null)
+        {
+            return FirstExisting(dirs, name, exts);
+        }
+
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         dirs.AddRange([Path.Combine(home, ".local", "bin"), Path.Combine(home, ".local", "opt", name), "/opt/" + name, "/usr/local/bin", "/Applications/" + name + ".app/Contents/MacOS"]);
+        return FirstExisting(dirs, name, exts);
+    }
+
+    private static string? FirstExisting(IEnumerable<string> dirs, string name, string[] exts)
+    {
         foreach (var d in dirs)
         {
             foreach (var e in exts)
@@ -41,6 +51,9 @@ public static class ExternalTool
 
         return null;
     }
+
+    /// <summary>Collaterale (formerly named Collate): the current command name first, then the old one for existing installs.</summary>
+    public static string? LocateCollaterale(string? searchPath = null) => Locate("collaterale", searchPath) ?? Locate("collate", searchPath);
 
     /// <summary>The program a template would start, resolved (null when it cannot be found).</summary>
     public static string? ResolveExecutable(string template)

@@ -24,7 +24,7 @@ All screenshots are generated from the real application by `scripts/update-docs.
 13. [Rewriting and moving: cherry-pick, revert, reset](#13-cherry-pick-revert-reset)
 14. [Blame and file history](#14-blame-and-file-history)
 15. [Resolving conflicts](#15-resolving-conflicts)
-15b. [External merge and diff tools (e.g. Collate)](#15b-external-merge-and-diff-tools-eg-collate)
+15b. [External merge and diff tools (e.g. Collaterale)](#15b-external-merge-and-diff-tools-eg-collaterale)
 16. [Themes](#16-themes)
 17. [Settings dialog and stored data](#17-settings-dialog-and-stored-data)
 18. [Keyboard shortcuts](#18-keyboard-shortcuts)
@@ -196,7 +196,7 @@ When a commit is selected, the right-hand pane of the History tab shows:
 2. **Commit information** – full hash, author, date and the full message (selectable text).
 3. **Changed files** – each with a badge: **A** added (green), **M** modified (amber), **D** deleted (red), **R** renamed (blue). Select a file to see its diff below. The first file is selected automatically.
 
-Right-click a file for **Blame (at this commit)**, **File history** (section 14) and **Open diff in external tool…** ([section 15b](#15b-external-merge-and-diff-tools-eg-collate)).
+Right-click a file for **Blame (at this commit)**, **File history** (section 14) and **Open diff in external tool…** ([section 15b](#15b-external-merge-and-diff-tools-eg-collaterale)).
 
 ### The diff panel
 
@@ -401,25 +401,25 @@ When a merge, pull, cherry-pick, revert or rebase stops because of conflicting c
 3. Select a conflicted file: the lower panel shows the file with its conflict markers. **Red = ours** (your current branch), **green = theirs** (the incoming change). *During a rebase git swaps the two: "ours" is the branch you are rebasing onto and "theirs" is your own commit being replayed.*; blue lines are the `<<<<<<<`, `=======`, `>>>>>>>` markers.
 4. Resolve each file, either:
    * right-click → **Accept ours (current branch)** or **Accept theirs (incoming)** – takes that whole version and stages it; or
-   * right-click → **Resolve in external merge tool…** to resolve it in a real three-way merge editor such as Collate ([section 15b](#15b-external-merge-and-diff-tools-eg-collate)); or
+   * right-click → **Resolve in external merge tool…** to resolve it in a real three-way merge editor such as Collaterale ([section 15b](#15b-external-merge-and-diff-tools-eg-collaterale)); or
    * right-click → **Open in default editor**, edit the file to the result you want (remove the markers), save, then click **＋** to mark it resolved.
 5. When no conflicted files remain, **Continue** becomes enabled. Click it to finish (a merge creates its merge commit with the default message; cherry-pick/revert/rebase continue to the next step).
 6. **Abort** (confirms first) abandons the operation and restores the state from before it began; resolutions made so far are lost.
 
 The banner also appears if you start such an operation in a terminal, and survives restarting the app.
 
-## 15b. External merge and diff tools (e.g. Collate)
+## 15b. External merge and diff tools (e.g. Collaterale)
 
-The built-in conflict view lets you take a whole side of a file. For anything finer you can hand the file to a dedicated **three-way merge tool** — and view any diff in your preferred **diff tool**. The app works with any program that can be started from a command line; **Collate** (a cross-platform compare and merge tool built with the same technology) is supported out of the box as a preset.
+The built-in conflict view lets you take a whole side of a file. For anything finer you can hand the file to a dedicated **three-way merge tool** — and view any diff in your preferred **diff tool**. The app works with any program that can be started from a command line; **Collaterale** (a cross-platform compare and merge tool built with the same technology; previously called Collate) is supported out of the box as a preset.
 
 ### Setting it up
 
 1. Open **⚙ Settings → External tools** (screenshot in [section 17](#17-settings-dialog-and-stored-data)).
-2. Choose a **Preset** — Collate, Meld, KDiff3 or VS Code — or type your own command in **Merge tool** / **Diff tool**.
+2. Choose a **Preset** — Collaterale, Meld, KDiff3 or VS Code — or type your own command in **Merge tool** / **Diff tool**.
 3. Check the line under each box: **✓ Found …** means the program was located on your `PATH` (hover for the full path); **✗ … was not found** means you need to install it or give a full path.
 4. Press **Save**. Leaving both boxes empty keeps only the built-in resolution.
 
-If nothing is configured but Collate is installed, Settings tells you so and the Collate preset is one click away.
+If nothing is configured but Collaterale is installed, Settings tells you so and the Collaterale preset is one click away. (Existing installs that still use the old command name `collate` are detected too.)
 
 ### Writing your own command
 
@@ -434,9 +434,9 @@ The command is split into a program and its arguments and started **directly, wi
 
 A variable the app does not know (for example a typo like `$MERGE`) is flagged in red and the settings are not saved.
 
-Example for Collate:
+Example for Collaterale:
 ```text
-collate --merge --base "$BASE" --left "$LOCAL" --right "$REMOTE" --output "$MERGED"
+collaterale --merge --base "$BASE" --left "$LOCAL" --right "$REMOTE" --output "$MERGED"
 ```
 
 ### Resolving a conflict with the tool
@@ -480,7 +480,7 @@ Click **⚙** in the toolbar. Changes apply when you press **Save** (**Esc**/Can
 |---|---|
 | **Git executable** | Leave empty to use `git` from your `PATH`. Set a full path to use a specific installation (for example a newer git, or Git for Windows in a custom folder). **Test** runs `git --version` and shows the result in green (✓) or an error (✗); **Browse…** lets you pick the file. Saving is refused while the path cannot be started. |
 | **Identity — Name / Email** | Your *global* git `user.name` and `user.email` (stored in your `~/.gitconfig`), used as the author of new commits. Clearing a field removes that key. A repository's own local config, if set, still takes precedence. |
-| **Preset / Merge tool / Diff tool** | An external program for three-way merges and for viewing diffs ([section 15b](#15b-external-merge-and-diff-tools-eg-collate)). Pick a preset (Collate, Meld, KDiff3, VS Code) or write your own command. A green ✓ means the program was found; a red message says why not. |
+| **Preset / Merge tool / Diff tool** | An external program for three-way merges and for viewing diffs ([section 15b](#15b-external-merge-and-diff-tools-eg-collaterale)). Pick a preset (Collaterale, Meld, KDiff3, VS Code) or write your own command. A green ✓ means the program was found; a red message says why not. |
 | **Pull with rebase** | Makes the toolbar **Pull** button rebase instead of merge. (The Pull **▾** menu can always choose explicitly.) |
 | **Commits loaded in History** | 500, 1000, 2000 (default), 5000 or 10000. Lower it for a faster view of huge repositories; raise it to see further back. |
 
@@ -539,7 +539,7 @@ Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete u
 ## 21. Known limitations
 
 * Interactive rebase supports pick, reword, squash, fixup, drop and reordering; the `edit` and `exec` todo commands, and rebasing merge commits, are not available. A rebase started elsewhere is recognized and can be continued or aborted.
-* Conflicts are resolved per file: take a side, edit in your editor, or use an **external** three-way merge tool such as Collate. There is no merge editor built into this window.
+* Conflicts are resolved per file: take a side, edit in your editor, or use an **external** three-way merge tool such as Collaterale. There is no merge editor built into this window.
 * Comparing two folders (for example two commits or branches) in an external tool is not available yet; only single-file diffs are.
 * Staging works per file, per hunk and per selected line (unified view only; not for untracked files).
 * Diffs highlight changes but have no language syntax coloring yet. In side-by-side mode lines are paired by position, so when a block changes many lines the pairs can look offset.
