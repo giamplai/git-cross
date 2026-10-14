@@ -12,7 +12,7 @@ History graph, staging by file / hunk / line, interactive rebase, blame, stashes
 ![.NET 10](https://img.shields.io/badge/.NET-10-512bd4)
 ![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)
 
-[User guide](docs/HOWTO.md) · [Install](#install) · [Build from source](#build-from-source) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+🇮🇹 [Italiano](README.it.md) · [User guide](docs/HOWTO.md) · [Install](#install) · [Build from source](#build-from-source) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
 </div>
 
