@@ -4,9 +4,19 @@ Only packages that end up in a release build are listed: AvaloniaUI.DiagnosticsS
 import json, os, re, sys
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-assets = json.load(open(os.path.join(HERE, 'src/GitCross.App/obj/project.assets.json')))
+def find_assets():
+    """project.assets.json lives under artifacts/obj (ArtifactsPath) or the project's own obj/, depending on the SDK settings."""
+    for root in ('artifacts/obj', 'src/GitCross.App/obj'):
+        for dp, _, fn in os.walk(os.path.join(HERE, root)):
+            if 'project.assets.json' in fn and os.path.basename(dp) == 'GitCross.App':
+                return os.path.join(dp, 'project.assets.json')
+    sys.exit("project.assets.json not found: run `dotnet restore` first")
+
+
+assets = json.load(open(find_assets()))
 cache = os.path.expanduser('~/.nuget/packages')
-EXCLUDE = {'avaloniaui.diagnosticssupport'}      # debug-only developer tool, never redistributed
+# build-time / debug-only tools that are never part of a release package
+EXCLUDE = {'avaloniaui.diagnosticssupport', 'microsoft.net.illink.tasks'}
 rows = []
 for key, lib in sorted(assets['libraries'].items()):
     if lib['type'] != 'package':

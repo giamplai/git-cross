@@ -89,6 +89,7 @@ Verify downloads against `SHA256SUMS`.
 ```bash
 git-cross                 # reopens the last repository, or shows the welcome screen
 git-cross /path/to/repo   # open a repository directly
+git cross /path/to/repo   # same thing: git runs any `git-cross` executable on your PATH as `git cross`
 ```
 
 | Shortcut | Action |

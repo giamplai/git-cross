@@ -55,9 +55,8 @@ Re-run it before every release (`scripts/check.sh` does not, because it needs an
 
 ## Open points for the maintainers
 
-* **Product name.** "git-cross" contains the upstream project's name. It is used descriptively and with a
-  non-affiliation notice, but a distinct name is advisable before any public release to avoid confusion with — or any
-  claim by — the upstream project. Renaming touches the binary, package names, and strings (`scripts/package.sh`,
-  `AppInfo.cs`, `packaging/`).
-* Ask upstream's maintainers if they object to the name before publishing; this is courtesy, not a requirement.
+* **Product name.** The project is called **git-cross** and does not use the upstream project's name, logo or icon.
+  The `git-` prefix is a deliberate nod to git's convention (an executable named `git-cross` on the `PATH` is also
+  reachable as `git cross`). *Git* is a trademark of the Software Freedom Conservancy; extensions such as `git-lfs` use the
+  same convention, but read the trademark policy at <https://git-scm.com/about/trademark> before any commercial use of the name.
 * macOS/Windows packages are unsigned (see RELEASING.md); this is unrelated to licensing.

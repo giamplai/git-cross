@@ -15,7 +15,7 @@ We thank the Git Extensions contributors for their work.
   git-cross is an independent implementation (new code, built on .NET and Avalonia). How this was checked,
   and the rules for contributors, are in [docs/PROVENANCE.md](docs/PROVENANCE.md).
 * This project is **not affiliated with, endorsed by, or sponsored by** the Git Extensions project or its contributors.
-  "Git Extensions" is the name of their project; "git-cross" only describes where this one took its inspiration.
+  "Git Extensions" is the name of their project; this project deliberately uses a different name and identity.
 * Git Extensions is licensed under the GNU GPL v3. Because no part of it is included here, this project is not a derivative
   work and is free to use the MIT License.
 

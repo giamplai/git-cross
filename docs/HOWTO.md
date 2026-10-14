@@ -48,6 +48,8 @@ Download the package for your system from the project's **Releases** page (each 
 | `git-cross_<version>_amd64.deb` / `_arm64.deb` (Debian, Ubuntu, Mint…) | `sudo apt install ./git-cross_<version>_amd64.deb` — adds a menu entry and the `git-cross` command. Remove with `sudo apt remove git-cross`. |
 | `git-cross-<version>-linux-x64.tar.gz` / `linux-arm64` (any distribution) | Extract, then run `./install.sh` for a per-user install (menu entry + `git-cross` in `~/.local/bin`), or just run `./git-cross` directly. Uninstall by deleting `~/.local/opt/git-cross`, `~/.local/bin/git-cross` and the `.desktop` file in `~/.local/share/applications`. |
 
+After a `.deb` or `install.sh` installation the command is available in any terminal as `git-cross` and — because git runs any `git-<name>` program found on your `PATH` as a subcommand — also as **`git cross`**. Run it inside a repository (or pass a path) to open that repository.
+
 ### Windows
 
 Download `git-cross-<version>-win-x64.zip`, extract it anywhere and double-click `git-cross.exe` (there is no installer; delete the folder to uninstall). Because the build is not code-signed, Windows SmartScreen may say "Windows protected your PC": click **More info → Run anyway**.
