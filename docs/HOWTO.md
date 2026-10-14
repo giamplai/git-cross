@@ -98,7 +98,7 @@ Below the buttons, **Recent** lists the last 15 repositories; click one to open 
 ![Clone dialog](images/clone-dialog.png)
 
 1. Paste the **Repository URL** (HTTPS, SSH or a local path).
-2. Choose the **Destination folder** (the parent folder; use **Browse…**). The dialog shows the exact folder that will be created, taken from the URL (`…/gitextensions.git` → `gitextensions`). The last folder you used is remembered.
+2. Choose the **Destination folder** (the parent folder; use **Browse…**). The dialog shows the exact folder that will be created, taken from the URL (`…/git-cross.git` → `git-cross`). The last folder you used is remembered.
 3. Leave **Also clone submodules (recursive)** ticked to fetch nested repositories too (untick for a faster clone and initialize them later), then click **Clone**. A progress bar is shown. On success the new repository opens automatically.
 
 Errors (empty URL, destination already exists and is not empty, network or authentication failures) appear in red inside the dialog and nothing is created. Clone never prompts interactively; use an SSH key or a configured credential helper for private repositories.

@@ -681,7 +681,7 @@ public class WindowRenderTests
     {
         var clone = new CloneWindow("/path/to/projects");
         clone.Show();
-        clone.FindControl<TextBox>("UrlBox")!.Text = "https://github.com/gitextensions/gitextensions.git";
+        clone.FindControl<TextBox>("UrlBox")!.Text = "https://github.com/giamplai/git-cross.git";
         await Settle();
         Shot(clone, "clone-dialog.png");
         clone.Close();
