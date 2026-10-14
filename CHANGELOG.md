@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+* Legal and provenance: GPL-3.0-only, credits to Git Extensions (README, NOTICE, Settings), THIRD-PARTY-NOTICES with verbatim OFL/BSD texts, notices shipped in every package, repeatable upstream-overlap audit.
 * External merge and diff tools: presets for Collaterale (formerly Collate), Meld, KDiff3 and VS Code or a custom command; resolve conflicts and open diffs from the file context menus.
 
 ## 0.1.0 — first release

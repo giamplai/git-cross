@@ -31,6 +31,7 @@ All screenshots are generated from the real application by `scripts/update-docs.
 19. [Safety: what asks for confirmation](#19-safety-what-asks-for-confirmation)
 20. [Troubleshooting](#20-troubleshooting)
 21. [Known limitations](#21-known-limitations)
+22. [About, credits and licenses](#22-about-credits-and-licenses)
 
 ---
 
@@ -545,3 +546,18 @@ Branch deletion is always the *safe* kind (`-d`); git itself refuses to delete u
 * Diffs highlight changes but have no language syntax coloring yet. In side-by-side mode lines are paired by position, so when a block changes many lines the pairs can look offset.
 * The history view loads a limited number of commits (2000 by default; see Settings).
 * Submodules can be listed, initialized, updated and opened, but adding/removing them or editing their URLs is not available in the app yet. Plugins, shell integration and localization are not implemented yet (see `docs/PORTING.md`).
+
+## 22. About, credits and licenses
+
+![Settings dialog with version, license and credit line](images/settings-dialog.png)
+
+The bottom-left corner of **⚙ Settings** shows the version, the license and a credit line.
+
+* **Credits.** git-cross is inspired by **[Git Extensions](https://github.com/gitextensions/gitextensions)**, the Windows Git client, and we thank its authors and contributors. This is an **independent implementation** — it contains none of Git Extensions' source code, translations or artwork — and it is **not affiliated with or endorsed by** that project.
+* **License.** The application is free software under the **GNU General Public License, version 3** (`LICENSE.md`). You may use, study, share and modify it under those terms; it comes with no warranty.
+* **Third-party components.** The app bundles open-source libraries (Avalonia, SkiaSharp, HarfBuzzSharp, the Inter typeface and the .NET runtime) under permissive licenses. Their names, versions and license texts are in `THIRD-PARTY-NOTICES.md`.
+* **Where to find these files.** They are inside every download: next to the program in the `.tar.gz` and `.zip`, in `git-cross.app/Contents/Resources` on macOS, and in `/usr/share/doc/git-cross/` after installing the `.deb`.
+* **Your repositories** are never uploaded anywhere; the application only runs `git` locally and the optional external tools you configure.
+* **Companion tools.** Merge/diff tools such as Collaterale are separate programs with their own licenses; they are started as external processes and are not part of this download.
+
+For how the "no copied code" claim is checked and the rules contributors follow, see `docs/PROVENANCE.md`.

@@ -21,7 +21,8 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         _settings = settings;
-        VersionText.Text = $"{AppInfo.Name} {AppInfo.Version}";
+        VersionText.Text = $"{AppInfo.Name} {AppInfo.Version}  ·  GPL-3.0";
+        CreditText.Text = AppInfo.Credit;
         GitPathBox.Text = settings.GitExecutable;
         PullRebaseBox.IsChecked = settings.PullRebase;
         MaxCommitsBox.ItemsSource = AppSettings.MaxCommitsChoices;

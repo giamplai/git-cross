@@ -597,7 +597,9 @@ public class WindowRenderTests
             await Settle();
             Assert.Equal("Ada Lovelace", dlg.FindControl<TextBox>("NameBox")!.Text);
             Assert.StartsWith("✓ git version", dlg.FindControl<TextBlock>("GitStatusText")!.Text);
-            Assert.Matches(@"^git-cross \d+\.\d+\.\d+", dlg.FindControl<TextBlock>("VersionText")!.Text);
+            Assert.Matches(@"^git-cross \d+\.\d+\.\d+  ·  GPL-3\.0$", dlg.FindControl<TextBlock>("VersionText")!.Text);
+            Assert.Contains("Inspired by Git Extensions", dlg.FindControl<TextBlock>("CreditText")!.Text);
+            Assert.Contains("Not affiliated", dlg.FindControl<TextBlock>("CreditText")!.Text);
             Assert.Contains("Collaterale was found", dlg.FindControl<TextBlock>("MergeStatus")!.Text); // nothing configured yet: hint only
 
             dlg.FindControl<ComboBox>("PresetBox")!.SelectedIndex = 1; // Collaterale

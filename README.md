@@ -14,4 +14,11 @@ scripts/check.sh                                       # build + tests
 
 Docs: [architecture](docs/ARCHITECTURE.md) · [porting map](docs/PORTING.md) · [roadmap](ROADMAP.md) · [contributing](CONTRIBUTING.md)
 
-Licensed GPL-3.0, like upstream.
+## Credits and license
+
+Inspired by **[Git Extensions](https://github.com/gitextensions/gitextensions)** — thank you to its authors and contributors.
+This is an independent implementation: no Git Extensions code, translations or artwork are included, and the project is not
+affiliated with them ([how this is verified](docs/PROVENANCE.md)).
+
+Licensed under the **GNU GPL v3** ([LICENSE.md](LICENSE.md)). Third-party components and their licenses:
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Overview: [NOTICE.md](NOTICE.md).

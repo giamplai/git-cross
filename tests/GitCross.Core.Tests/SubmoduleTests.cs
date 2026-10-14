@@ -27,11 +27,11 @@ public class SubmoduleTests
     public void Garbage_lines_are_ignored() => Assert.Empty(SubmoduleParser.ParseStatus("fatal: nope\n", new Dictionary<string, (string, string?)>()));
 
     /// <summary>Recent git refuses file:// submodule transports unless allowed; scope the exception to this test.</summary>
-    private sealed class AllowFileProtocol : IDisposable
+    private sealed class FileTransportScope : IDisposable
     {
         private readonly string?[] _old = new[] { "GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0" }.Select(Environment.GetEnvironmentVariable).ToArray();
 
-        public AllowFileProtocol()
+        public FileTransportScope()
         {
             Environment.SetEnvironmentVariable("GIT_CONFIG_COUNT", "1");
             Environment.SetEnvironmentVariable("GIT_CONFIG_KEY_0", "protocol.file.allow");
@@ -49,7 +49,7 @@ public class SubmoduleTests
     [Fact]
     public async Task Add_modify_clone_and_update_submodule()
     {
-        using var _ = new AllowFileProtocol();
+        using var _ = new FileTransportScope();
 
         var (libT, lib) = await TempRepo.CreateAsync();
         var (superT, sup) = await TempRepo.CreateAsync();

@@ -1,4 +1,7 @@
-# Porting map (upstream GitExtensions → git-cross)
+# Feature map (Git Extensions as the reference → git-cross)
+
+This tracks *which capabilities* of Git Extensions we have matched. Nothing is ported as code: every feature is an original
+implementation (see [PROVENANCE.md](PROVENANCE.md)).
 
 | Feature | Status | Notes |
 |---|---|---|
