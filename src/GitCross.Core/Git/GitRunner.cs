@@ -72,6 +72,34 @@ public sealed class GitRunner(string workingDirectory, string? gitExecutable = n
         return new GitResult(p.ExitCode, await outTask, await errTask);
     }
 
+    /// <summary>Runs git and returns stdout as raw bytes (file contents must not go through a text decoder).</summary>
+    public async Task<(int ExitCode, byte[] Data, string StdErr)> RunBytesAsync(IEnumerable<string> args, CancellationToken ct = default)
+    {
+        var psi = new ProcessStartInfo(gitExecutable ?? Executable)
+        {
+            WorkingDirectory = WorkingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardErrorEncoding = Encoding.UTF8,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        foreach (var a in args)
+        {
+            psi.ArgumentList.Add(a);
+        }
+
+        psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        psi.Environment["LC_ALL"] = "C";
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException("Cannot start git");
+        using var ms = new MemoryStream();
+        var copy = p.StandardOutput.BaseStream.CopyToAsync(ms, ct);
+        var err = p.StandardError.ReadToEndAsync(ct);
+        await copy;
+        await p.WaitForExitAsync(ct);
+        return (p.ExitCode, ms.ToArray(), await err);
+    }
+
     public Task<GitResult> RunAsync(params string[] args) => RunAsync(args, null, default);
 
     public async Task<string> OutAsync(params string[] args)

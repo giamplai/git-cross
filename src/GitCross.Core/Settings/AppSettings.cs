@@ -19,6 +19,12 @@ public sealed class AppSettings
     /// <summary>When true the toolbar Pull button rebases instead of merging.</summary>
     public bool PullRebase { get; set; }
 
+    /// <summary>External three-way merge tool, as a command template (see CommandTemplate); empty = built-in resolution only.</summary>
+    public string? MergeTool { get; set; }
+
+    /// <summary>External diff tool template using $LOCAL and $REMOTE.</summary>
+    public string? DiffTool { get; set; }
+
     /// <summary>Diff viewer shows old and new side by side instead of unified.</summary>
     public bool SplitDiff { get; set; }
 

@@ -3,6 +3,7 @@ using GitCross.Core.Diff;
 using GitCross.Core.Models;
 using GitCross.Core.Rebase;
 using GitCross.Core.Submodules;
+using GitCross.Core.Tools;
 
 namespace GitCross.Core.Git;
 
@@ -324,6 +325,124 @@ public sealed class GitRepository
         await _git.OutAsync("add", "--", path);
     }
 
+    public enum ConflictSide { Base = 1, Ours = 2, Theirs = 3 }
+
+    /// <summary>Writes one index stage of a conflicted file to <paramref name="target"/>. False when that stage does not exist (add/add, delete/modify).</summary>
+    public async Task<bool> ExtractStageAsync(string path, ConflictSide side, string target)
+    {
+        var (code, data, _) = await _git.RunBytesAsync(["cat-file", "blob", $":{(int)side}:{path}"]);
+        if (code != 0)
+        {
+            return false;
+        }
+
+        await File.WriteAllBytesAsync(target, data);
+        return true;
+    }
+
+    /// <summary>Writes <paramref name="rev"/>:<paramref name="path"/> to <paramref name="target"/>; an absent file (added/deleted) becomes an empty file and returns false.</summary>
+    public async Task<bool> ExtractBlobAsync(string rev, string path, string target)
+    {
+        var (code, data, _) = await _git.RunBytesAsync(["cat-file", "blob", $"{rev}:{path}"]);
+        await File.WriteAllBytesAsync(target, code == 0 ? data : []);
+        return code == 0;
+    }
+
+    /// <summary>
+    /// Resolves a conflicted file with an external three-way merge tool. The tool writes to a temporary output;
+    /// only when it exits 0 is the result copied into the work tree and staged, so a cancelled tool leaves the conflict untouched.
+    /// </summary>
+    public async Task<ToolMergeOutcome> ResolveWithToolAsync(string path, string template, CancellationToken ct = default)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "gxc-merge-" + Guid.NewGuid().ToString("N")[..10]);
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var name = Path.GetFileName(path);
+            string Tmp(string tag) => Path.Combine(dir, $"{tag}_{name}");
+            var (local, remote, baseFile, merged) = (Tmp("LOCAL"), Tmp("REMOTE"), Tmp("BASE"), Tmp("MERGED"));
+
+            if (!await ExtractStageAsync(path, ConflictSide.Ours, local) || !await ExtractStageAsync(path, ConflictSide.Theirs, remote))
+            {
+                return new ToolMergeOutcome(false, "This conflict has no “ours” or “theirs” version (one side deleted the file). Use Accept ours / Accept theirs instead.");
+            }
+
+            if (!await ExtractStageAsync(path, ConflictSide.Base, baseFile))
+            {
+                await File.WriteAllBytesAsync(baseFile, []); // added on both sides: merge against an empty ancestor
+            }
+
+            var run = await ExternalTool.RunAsync(template, new Dictionary<string, string>
+            {
+                [CommandTemplate.Base] = baseFile,
+                [CommandTemplate.Local] = local,
+                [CommandTemplate.Remote] = remote,
+                [CommandTemplate.Merged] = merged,
+            }, ct);
+
+            if (!run.Started)
+            {
+                return new ToolMergeOutcome(false, run.StartError);
+            }
+
+            if (!run.Succeeded || !File.Exists(merged))
+            {
+                return new ToolMergeOutcome(false, "The merge tool was closed without saving a resolved result; the file is still conflicted.");
+            }
+
+            File.Copy(merged, ResolvePath(path), overwrite: true);
+            await _git.OutAsync("add", "--", path);
+            return new ToolMergeOutcome(true, null);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    /// <summary>Which two versions of a file to put side by side in a diff tool.</summary>
+    public enum DiffTarget { Unstaged, Staged, Commit }
+
+    /// <summary>Opens the old and new version of one file in an external diff tool (waits for it to exit).</summary>
+    public async Task<ToolMergeOutcome> DiffWithToolAsync(string path, DiffTarget target, string? commitSha, string template, CancellationToken ct = default)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "gxc-diff-" + Guid.NewGuid().ToString("N")[..10]);
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var name = Path.GetFileName(path);
+            var (left, right) = (Path.Combine(dir, "old_" + name), Path.Combine(dir, "new_" + name));
+            switch (target)
+            {
+                case DiffTarget.Unstaged:
+                    await ExtractBlobAsync("", path, left);        // ":path" = index version
+                    File.Copy(ResolvePath(path), right, true);
+                    break;
+                case DiffTarget.Staged:
+                    await ExtractBlobAsync("HEAD", path, left);
+                    await ExtractBlobAsync("", path, right);
+                    break;
+                default:
+                    var sha = commitSha ?? throw new ArgumentNullException(nameof(commitSha));
+                    var hasParent = (await _git.RunAsync("rev-parse", "--verify", "--quiet", sha + "^1")).Success;
+                    if (hasParent) { await ExtractBlobAsync(sha + "^1", path, left); } else { await File.WriteAllBytesAsync(left, []); }
+                    await ExtractBlobAsync(sha, path, right);
+                    break;
+            }
+
+            var run = await ExternalTool.RunAsync(template, new Dictionary<string, string>
+            {
+                [CommandTemplate.Local] = left,
+                [CommandTemplate.Remote] = right,
+            }, ct);
+            return new ToolMergeOutcome(run.Started, run.StartError);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
     public string ResolvePath(string relative) => Path.Combine(Root, relative.Replace('/', Path.DirectorySeparatorChar));
 
     public Task CherryPickAsync(string sha) => _git.OutAsync("cherry-pick", sha);
@@ -339,6 +458,8 @@ public sealed class GitRepository
         => _git.OutAsync("reset", mode switch { ResetMode.Soft => "--soft", ResetMode.Hard => "--hard", _ => "--mixed" }, sha);
 
 }
+
+public sealed record ToolMergeOutcome(bool Success, string? Message);
 
 public enum ResetMode { Soft, Mixed, Hard }
 
