@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=git-cross
+GenericName=Git Client
+Comment=Fast, native Git client for Linux, macOS and Windows
+Exec=git-cross %F
+Icon=git-cross
+Terminal=false
+Categories=Development;RevisionControl;
+Keywords=git;version control;repository;commit;branch;
+StartupWMClass=git-cross

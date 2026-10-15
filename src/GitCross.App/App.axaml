@@ -1,0 +1,83 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="GitCross.App.App"
+             RequestedThemeVariant="Default">
+  <Application.Resources>
+    <ResourceDictionary>
+      <FontFamily x:Key="MonoFont">Cascadia Mono,JetBrains Mono,Fira Code,DejaVu Sans Mono,Menlo,Consolas,monospace</FontFamily>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <Color x:Key="AccentColor">#3D6BE0</Color>
+          <SolidColorBrush x:Key="AccentBrush" Color="#3D6BE0" />
+          <SolidColorBrush x:Key="WindowBrush" Color="#F3F4F7" />
+          <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="PanelAltBrush" Color="#F8F9FB" />
+          <SolidColorBrush x:Key="LineBrush" Color="#E2E5EB" />
+          <SolidColorBrush x:Key="MutedBrush" Color="#6B7280" />
+          <SolidColorBrush x:Key="HoverBrush" Color="#EEF1F8" />
+          <SolidColorBrush x:Key="ErrorBrush" Color="#C73A3F" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <Color x:Key="AccentColor">#6C93FF</Color>
+          <SolidColorBrush x:Key="AccentBrush" Color="#5B86F5" />
+          <SolidColorBrush x:Key="WindowBrush" Color="#16181D" />
+          <SolidColorBrush x:Key="PanelBrush" Color="#1E2128" />
+          <SolidColorBrush x:Key="PanelAltBrush" Color="#1A1D23" />
+          <SolidColorBrush x:Key="LineBrush" Color="#2C303A" />
+          <SolidColorBrush x:Key="MutedBrush" Color="#8B93A3" />
+          <SolidColorBrush x:Key="HoverBrush" Color="#272B35" />
+          <SolidColorBrush x:Key="ErrorBrush" Color="#FF7B80" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+
+    <Style Selector="Window"><Setter Property="Background" Value="{DynamicResource WindowBrush}" /></Style>
+
+    <!-- Surfaces -->
+    <Style Selector="Border.panel">
+      <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}" /></Style>
+    <Style Selector="TextBlock.mono"><Setter Property="FontFamily" Value="{DynamicResource MonoFont}" /><Setter Property="FontSize" Value="12" /></Style>
+    <Style Selector="TextBlock.section"><Setter Property="FontSize" Value="11" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Foreground" Value="{DynamicResource MutedBrush}" /></Style>
+
+    <!-- Toolbar buttons: flat, compact -->
+    <Style Selector="Button.tool">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style Selector="SplitButton.tool /template/ Button"><Setter Property="Background" Value="Transparent" /></Style>
+    <Style Selector="SplitButton.tool /template/ Button:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource HoverBrush}" /></Style>
+    <Style Selector="Button.tool:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource HoverBrush}" /></Style>
+    <Style Selector="Button.accent"><Setter Property="Background" Value="{DynamicResource AccentBrush}" /><Setter Property="Foreground" Value="White" /></Style>
+    <Style Selector="Button.accent /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource AccentBrush}" /><Setter Property="Foreground" Value="White" /></Style>
+    <Style Selector="Button.accent:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource AccentBrush}" /><Setter Property="Opacity" Value="0.88" /></Style>
+    <Style Selector="Button.mini"><Setter Property="Padding" Value="7,1" /><Setter Property="MinHeight" Value="0" /><Setter Property="FontSize" Value="12" /><Setter Property="CornerRadius" Value="5" /></Style>
+
+    <!-- Chips and badges -->
+    <Style Selector="Border.chip"><Setter Property="CornerRadius" Value="9" /><Setter Property="Padding" Value="7,1" /><Setter Property="Margin" Value="0,0,5,0" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+    <Style Selector="Border.chip > TextBlock"><Setter Property="Foreground" Value="White" /><Setter Property="FontSize" Value="11" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+    <Style Selector="Border.avatar"><Setter Property="Width" Value="20" /><Setter Property="Height" Value="20" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Margin" Value="0,0,7,0" /></Style>
+    <Style Selector="Border.avatar > TextBlock"><Setter Property="Foreground" Value="White" /><Setter Property="FontSize" Value="9" /><Setter Property="FontWeight" Value="Bold" /><Setter Property="HorizontalAlignment" Value="Center" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+    <Style Selector="Border.kind"><Setter Property="Width" Value="18" /><Setter Property="Height" Value="18" /><Setter Property="CornerRadius" Value="4" /><Setter Property="Margin" Value="0,0,8,0" /></Style>
+    <Style Selector="Border.kind > TextBlock"><Setter Property="Foreground" Value="White" /><Setter Property="FontSize" Value="10" /><Setter Property="FontWeight" Value="Bold" /><Setter Property="HorizontalAlignment" Value="Center" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+
+    <!-- Lists -->
+    <Style Selector="ListBox"><Setter Property="Background" Value="Transparent" /><Setter Property="Padding" Value="0" /></Style>
+    <Style Selector="ListBox.tight ListBoxItem"><Setter Property="Padding" Value="8,0" /><Setter Property="MinHeight" Value="26" /></Style>
+    <Style Selector="ListBox.history ListBoxItem"><Setter Property="Padding" Value="0" /><Setter Property="MinHeight" Value="28" /></Style>
+    <Style Selector="ListBox.diff ListBoxItem"><Setter Property="Padding" Value="0" /><Setter Property="MinHeight" Value="0" /></Style>
+
+    <Style Selector="TabControl"><Setter Property="Padding" Value="0" /></Style>
+    <Style Selector="TabItem"><Setter Property="FontSize" Value="14" /><Setter Property="Padding" Value="14,8" /></Style>
+    <Style Selector="GridSplitter"><Setter Property="Background" Value="Transparent" /></Style>
+  </Application.Styles>
+</Application>

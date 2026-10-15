@@ -1,0 +1,466 @@
+using GitCross.Core.Blame;
+using GitCross.Core.Diff;
+using GitCross.Core.Models;
+using GitCross.Core.Rebase;
+using GitCross.Core.Submodules;
+using GitCross.Core.Tools;
+
+namespace GitCross.Core.Git;
+
+/// <summary>High level operations on one repository. Every method maps to plain git CLI calls.</summary>
+public sealed class GitRepository
+{
+    private readonly GitRunner _git;
+
+    private GitRepository(string root)
+    {
+        Root = root;
+        _git = new GitRunner(root);
+    }
+
+    public string Root { get; }
+
+    public string Name => Path.GetFileName(Root.TrimEnd(Path.DirectorySeparatorChar, '/'));
+
+    /// <summary>Returns the repository for <paramref name="path"/> (any folder inside a work tree), or null.</summary>
+    public static async Task<GitRepository?> OpenAsync(string path)
+    {
+        if (!Directory.Exists(path))
+        {
+            return null;
+        }
+
+        var probe = await new GitRunner(path).RunAsync("rev-parse", "--show-toplevel");
+        return probe.Success ? new GitRepository(Path.GetFullPath(probe.StdOut.Trim())) : null;
+    }
+
+    public static async Task<GitRepository> InitAsync(string path)
+    {
+        Directory.CreateDirectory(path);
+        await new GitRunner(path).OutAsync("init");
+        return (await OpenAsync(path))!;
+    }
+
+    /// <summary>Folder name git would pick for a clone URL ("https://x/y/repo.git" → "repo").</summary>
+    public static string SuggestFolderName(string url)
+    {
+        var u = url.Trim().TrimEnd('/', '\\');
+        if (u.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
+        {
+            u = u[..^4];
+        }
+
+        var i = u.LastIndexOfAny(['/', '\\', ':']);
+        return i >= 0 ? u[(i + 1)..] : u;
+    }
+
+    public static async Task<GitRepository> CloneAsync(string url, string target, bool recursive = false)
+    {
+        var parent = Path.GetDirectoryName(Path.GetFullPath(target))!;
+        Directory.CreateDirectory(parent);
+        await new GitRunner(parent).OutAsync(recursive ? ["clone", "--recurse-submodules", url, target] : ["clone", url, target]);
+        return (await OpenAsync(target))!;
+    }
+
+    public async Task<IReadOnlyList<Commit>> GetLogAsync(int max = 2000, string? skipSha = null, bool all = true)
+    {
+        List<string> a = ["log", "--topo-order", $"--max-count={max}", $"--format={Parsers.LogFormat}"];
+        if (all)
+        {
+            // Stash commits (and their internal index/untracked parents) would clutter the graph.
+            a.AddRange(["--exclude=refs/stash", "--all"]);
+        }
+
+        var r = await _git.RunAsync(a, null, default);
+        return r.Success ? Parsers.ParseLog(r.StdOut).ToList() : []; // empty repo => no commits
+    }
+
+    /// <summary>Per-line authorship of <paramref name="path"/> at <paramref name="rev"/> (null = work tree).</summary>
+    public async Task<IReadOnlyList<BlameLine>> GetBlameAsync(string path, string? rev = null)
+        => BlameParser.Parse(await _git.OutAsync(rev is null
+            ? ["blame", "--porcelain", "--", path]
+            : ["blame", "--porcelain", rev, "--", path]));
+
+    /// <summary>Commits touching one file, following renames.</summary>
+    public async Task<IReadOnlyList<Commit>> GetFileLogAsync(string path, int max = 2000)
+    {
+        var r = await _git.RunAsync(["log", "--follow", $"--max-count={max}", $"--format={Parsers.LogFormat}", "--", path], null, default);
+        return r.Success ? Parsers.ParseLog(r.StdOut).ToList() : [];
+    }
+
+    /// <summary>Submodules of this repository (empty when it has none).</summary>
+    public async Task<IReadOnlyList<SubmoduleInfo>> GetSubmodulesAsync()
+    {
+        if (!File.Exists(Path.Combine(Root, ".gitmodules")))
+        {
+            return [];
+        }
+
+        var cfg = await _git.RunAsync(["config", "-f", ".gitmodules", "-z", "--get-regexp", @"^submodule\..*\.(path|url)$"], null, default);
+        var map = cfg.Success ? SubmoduleParser.ParseModulesConfig(cfg.StdOut) : [];
+        var status = await _git.RunAsync("submodule", "status");
+        return status.Success ? SubmoduleParser.ParseStatus(status.StdOut, map) : [];
+    }
+
+    /// <summary>Clones missing submodules and checks out the recorded commits (all of them, or just <paramref name="path"/>).</summary>
+    public Task SubmoduleUpdateAsync(string? path = null, bool recursive = true)
+    {
+        List<string> a = ["submodule", "update", "--init"];
+        if (recursive) { a.Add("--recursive"); }
+        if (path is not null) { a.AddRange(["--", path]); }
+        return _git.OutAsync([.. a]);
+    }
+
+    public Task SubmoduleAddAsync(string url, string path) => _git.OutAsync("submodule", "add", url, path);
+
+    /// <summary>Re-reads .gitmodules URLs into the repository configuration.</summary>
+    public Task SubmoduleSyncAsync() => _git.OutAsync("submodule", "sync", "--recursive");
+
+    public string SubmoduleFullPath(SubmoduleInfo s) => ResolvePath(s.Path);
+
+    public async Task<IReadOnlyList<GitRef>> GetRefsAsync()
+        => Parsers.ParseRefs(await _git.OutAsync("for-each-ref", $"--format={Parsers.RefFormat}")).ToList();
+
+    public async Task<WorkingStatus> GetStatusAsync()
+        => Parsers.ParseStatus(await _git.OutAsync("status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all"));
+
+    /// <summary>Files changed by a commit relative to its first parent (root commits: relative to the empty tree).</summary>
+    public async Task<IReadOnlyList<FileChange>> GetCommitFilesAsync(string sha)
+        => Parsers.ParseNameStatus(await _git.OutAsync(await HasParentAsync(sha)
+            ? ["diff", "--name-status", "-z", "--find-renames", sha + "^1", sha]
+            : ["diff-tree", "--no-commit-id", "--name-status", "-r", "-z", "--root", sha])).ToList();
+
+    private async Task<bool> HasParentAsync(string sha) => (await _git.RunAsync("rev-parse", "--verify", "--quiet", sha + "^1")).Success;
+
+    public async Task<string> GetCommitMessageAsync(string sha)
+        => (await _git.OutAsync("show", "-s", "--format=%B", sha)).TrimEnd();
+
+    public async Task<string> GetCommitDiffAsync(string sha, string path)
+        => await HasParentAsync(sha)
+            ? await _git.OutAsync("diff", "--find-renames", sha + "^1", sha, "--", path)
+            : await _git.OutAsync("show", "--format=", sha, "--", path);
+
+    public async Task<string> GetWorkingDiffAsync(string path, bool staged, bool untracked = false)
+    {
+        if (untracked)
+        {
+            // --no-index exits with 1 when files differ; that is expected here.
+            var r = await _git.RunAsync(["diff", "--no-index", "--", NullDevice, path], null, default);
+            return r.StdOut;
+        }
+
+        return staged
+            ? await _git.OutAsync("diff", "--cached", "--", path)
+            : await _git.OutAsync("diff", "--", path);
+    }
+
+    private static string NullDevice => OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
+
+    public Task StageAsync(IEnumerable<string> paths) => _git.OutAsync(["add", "--", .. paths]);
+
+    public Task UnstageAsync(IEnumerable<string> paths) => _git.OutAsync(["reset", "-q", "HEAD", "--", .. paths]);
+
+    public Task DiscardAsync(IEnumerable<string> paths) => _git.OutAsync(["checkout", "--", .. paths]);
+
+    public Task CommitAsync(string message, bool amend = false)
+        => _git.OutAsync(amend ? ["commit", "--amend", "-m", message] : ["commit", "-m", message]);
+
+    public Task CheckoutAsync(string target) => _git.OutAsync("checkout", target);
+
+    public Task CreateBranchAsync(string name, string? startPoint = null, bool checkout = true)
+        => checkout
+            ? _git.OutAsync(startPoint is null ? ["checkout", "-b", name] : ["checkout", "-b", name, startPoint])
+            : _git.OutAsync(startPoint is null ? ["branch", name] : ["branch", name, startPoint]);
+
+    public Task DeleteBranchAsync(string name, bool force = false) => _git.OutAsync("branch", force ? "-D" : "-d", name);
+
+    public Task CreateTagAsync(string name, string? sha = null) => _git.OutAsync(sha is null ? ["tag", name] : ["tag", name, sha]);
+
+    public Task MergeAsync(string branch, MergeMode mode = MergeMode.Default)
+        => _git.OutAsync(mode switch
+        {
+            MergeMode.NoFastForward => ["merge", "--no-ff", branch],
+            MergeMode.FastForwardOnly => ["merge", "--ff-only", branch],
+            MergeMode.Squash => ["merge", "--squash", branch], // stages the result; the user commits it
+            _ => ["merge", branch],
+        });
+
+    /// <summary>Replays the current branch's commits on top of <paramref name="onto"/>. Conflicts leave a Rebase operation in progress.</summary>
+    /// <summary>Commits that an interactive rebase onto <paramref name="onto"/> would replay, oldest first (merge commits are not replayed by rebase).</summary>
+    public async Task<IReadOnlyList<Commit>> GetRebaseCandidatesAsync(string onto)
+    {
+        var r = await _git.RunAsync(["log", "--reverse", "--no-merges", $"--format={Parsers.LogFormat}", $"{onto}..HEAD"], null, default);
+        return r.Success ? Parsers.ParseLog(r.StdOut).ToList() : [];
+    }
+
+    /// <summary>Runs <c>git rebase -i</c> with a todo list built by the app (no editor involved). Conflicts leave a Rebase operation in progress.</summary>
+    public async Task InteractiveRebaseAsync(string onto, IReadOnlyList<RebaseTodoItem> todo)
+    {
+        if (InteractiveRebasePlanner.Validate(todo) is { } problem)
+        {
+            throw new InvalidOperationException(problem);
+        }
+
+        var dir = Path.Combine(Path.GetTempPath(), "gxc-rebase-" + Guid.NewGuid().ToString("N")[..10]);
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var todoFile = Path.Combine(dir, "todo.txt");
+            File.WriteAllText(todoFile, InteractiveRebasePlanner.BuildTodo(todo, dir));
+            // git appends the real todo path; our "editor" simply overwrites it with the prepared list.
+            var editor = "cp " + InteractiveRebasePlanner.ShellQuote(todoFile);
+            var env = new Dictionary<string, string> { ["GIT_SEQUENCE_EDITOR"] = editor };
+            (await _git.RunAsync(["rebase", "-i", onto], null, default, env)).OrThrow("rebase -i " + onto);
+        }
+        finally
+        {
+            // After a conflict the exec lines still need their message files, so keep them until the operation ends.
+            if (await GetOperationAsync() != GitOperation.Rebase)
+            {
+                try { Directory.Delete(dir, true); } catch (IOException) { }
+            }
+        }
+    }
+
+    public Task RebaseAsync(string onto) => _git.OutAsync("rebase", onto);
+
+    public Task FetchAsync() => _git.OutAsync("fetch", "--all", "--prune");
+
+    public Task PullAsync(bool rebase = false) => _git.OutAsync(rebase ? ["pull", "--rebase"] : ["pull"]);
+
+    public Task PushAsync(bool setUpstream = false)
+        => _git.OutAsync(setUpstream ? ["push", "-u", "origin", "HEAD"] : ["push"]);
+
+    public Task StashPushAsync(string? message = null)
+        => _git.OutAsync(message is null ? ["stash", "push", "-u"] : ["stash", "push", "-u", "-m", message]);
+
+    public Task StashPopAsync() => _git.OutAsync("stash", "pop");
+
+    public async Task<IReadOnlyList<StashEntry>> GetStashesAsync()
+        => Parsers.ParseStashes(await _git.OutAsync("stash", "list", $"--format={Parsers.StashFormat}")).ToList();
+
+    public Task StashApplyAsync(StashEntry s) => _git.OutAsync("stash", "apply", s.Ref);
+
+    public Task StashPopAsync(StashEntry s) => _git.OutAsync("stash", "pop", s.Ref);
+
+    public Task StashDropAsync(StashEntry s) => _git.OutAsync("stash", "drop", s.Ref);
+
+    /// <summary>Applies a patch from memory. <paramref name="toIndex"/> targets the index (staging), otherwise the work tree.</summary>
+    public async Task ApplyPatchAsync(string patch, bool toIndex, bool reverse)
+    {
+        List<string> a = ["apply", "--whitespace=nowarn", "--recount"];
+        if (toIndex) { a.Add("--cached"); }
+        if (reverse) { a.Add("--reverse"); }
+        (await _git.RunAsync(a, patch, default)).OrThrow(string.Join(' ', a));
+    }
+
+    /// <summary>Stage (or, with <paramref name="unstage"/>, unstage) one hunk of a tracked file.</summary>
+    public async Task StageHunkAsync(string path, int hunkIndex, bool unstage)
+    {
+        var diff = await GetWorkingDiffAsync(path, staged: unstage);
+        var patch = PatchBuilder.BuildHunkPatch(diff, hunkIndex) ?? throw new InvalidOperationException("Hunk no longer exists; refresh and retry.");
+        await ApplyPatchAsync(patch, toIndex: true, reverse: unstage);
+    }
+
+    /// <summary>Stage or unstage only the selected changed lines (hunk index → body line indexes).</summary>
+    public async Task StageLinesAsync(string path, IReadOnlyDictionary<int, ISet<int>> selection, bool unstage)
+    {
+        var diff = await GetWorkingDiffAsync(path, staged: unstage);
+        var patch = PatchBuilder.BuildLinePatch(diff, selection, unstage ? PartialMode.Reverse : PartialMode.Stage)
+            ?? throw new InvalidOperationException("The selected lines no longer exist; refresh and retry.");
+        await ApplyPatchAsync(patch, toIndex: true, reverse: unstage);
+    }
+
+    /// <summary>Permanently revert only the selected changed lines in the work tree.</summary>
+    public async Task DiscardLinesAsync(string path, IReadOnlyDictionary<int, ISet<int>> selection)
+    {
+        var diff = await GetWorkingDiffAsync(path, staged: false);
+        var patch = PatchBuilder.BuildLinePatch(diff, selection, PartialMode.Reverse)
+            ?? throw new InvalidOperationException("The selected lines no longer exist; refresh and retry.");
+        await ApplyPatchAsync(patch, toIndex: false, reverse: true);
+    }
+
+    public async Task DiscardHunkAsync(string path, int hunkIndex)
+    {
+        var diff = await GetWorkingDiffAsync(path, staged: false);
+        var patch = PatchBuilder.BuildHunkPatch(diff, hunkIndex) ?? throw new InvalidOperationException("Hunk no longer exists; refresh and retry.");
+        await ApplyPatchAsync(patch, toIndex: false, reverse: true);
+    }
+
+    /// <summary>Which paused operation (if any) is in progress, detected from the files git leaves in its directory.</summary>
+    public async Task<GitOperation> GetOperationAsync()
+    {
+        var dir = (await _git.OutAsync("rev-parse", "--absolute-git-dir")).Trim();
+        bool F(string n) => File.Exists(Path.Combine(dir, n));
+        bool D(string n) => Directory.Exists(Path.Combine(dir, n));
+        if (D("rebase-merge") || D("rebase-apply")) { return GitOperation.Rebase; }
+        if (F("MERGE_HEAD")) { return GitOperation.Merge; }
+        if (F("CHERRY_PICK_HEAD")) { return GitOperation.CherryPick; }
+        if (F("REVERT_HEAD")) { return GitOperation.Revert; }
+        return GitOperation.None;
+    }
+
+    public Task ContinueAsync(GitOperation op) => op switch
+    {
+        GitOperation.Merge => _git.OutAsync("commit", "--no-edit"),
+        GitOperation.CherryPick => _git.OutAsync("cherry-pick", "--continue"),
+        GitOperation.Revert => _git.OutAsync("revert", "--continue"),
+        GitOperation.Rebase => _git.OutAsync("rebase", "--continue"),
+        _ => Task.CompletedTask,
+    };
+
+    public Task AbortAsync(GitOperation op) => op switch
+    {
+        GitOperation.Merge => _git.OutAsync("merge", "--abort"),
+        GitOperation.CherryPick => _git.OutAsync("cherry-pick", "--abort"),
+        GitOperation.Revert => _git.OutAsync("revert", "--abort"),
+        GitOperation.Rebase => _git.OutAsync("rebase", "--abort"),
+        _ => Task.CompletedTask,
+    };
+
+    /// <summary>Resolve a conflicted file by taking one side wholesale ("ours" = current branch) and staging it.</summary>
+    public async Task ResolveAsync(string path, bool takeOurs)
+    {
+        await _git.OutAsync("checkout", takeOurs ? "--ours" : "--theirs", "--", path);
+        await _git.OutAsync("add", "--", path);
+    }
+
+    public enum ConflictSide { Base = 1, Ours = 2, Theirs = 3 }
+
+    /// <summary>Writes one index stage of a conflicted file to <paramref name="target"/>. False when that stage does not exist (add/add, delete/modify).</summary>
+    public async Task<bool> ExtractStageAsync(string path, ConflictSide side, string target)
+    {
+        var (code, data, _) = await _git.RunBytesAsync(["cat-file", "blob", $":{(int)side}:{path}"]);
+        if (code != 0)
+        {
+            return false;
+        }
+
+        await File.WriteAllBytesAsync(target, data);
+        return true;
+    }
+
+    /// <summary>Writes <paramref name="rev"/>:<paramref name="path"/> to <paramref name="target"/>; an absent file (added/deleted) becomes an empty file and returns false.</summary>
+    public async Task<bool> ExtractBlobAsync(string rev, string path, string target)
+    {
+        var (code, data, _) = await _git.RunBytesAsync(["cat-file", "blob", $"{rev}:{path}"]);
+        await File.WriteAllBytesAsync(target, code == 0 ? data : []);
+        return code == 0;
+    }
+
+    /// <summary>
+    /// Resolves a conflicted file with an external three-way merge tool. The tool writes to a temporary output;
+    /// only when it exits 0 is the result copied into the work tree and staged, so a cancelled tool leaves the conflict untouched.
+    /// </summary>
+    public async Task<ToolMergeOutcome> ResolveWithToolAsync(string path, string template, CancellationToken ct = default)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "gxc-merge-" + Guid.NewGuid().ToString("N")[..10]);
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var name = Path.GetFileName(path);
+            string Tmp(string tag) => Path.Combine(dir, $"{tag}_{name}");
+            var (local, remote, baseFile, merged) = (Tmp("LOCAL"), Tmp("REMOTE"), Tmp("BASE"), Tmp("MERGED"));
+
+            if (!await ExtractStageAsync(path, ConflictSide.Ours, local) || !await ExtractStageAsync(path, ConflictSide.Theirs, remote))
+            {
+                return new ToolMergeOutcome(false, "This conflict has no “ours” or “theirs” version (one side deleted the file). Use Accept ours / Accept theirs instead.");
+            }
+
+            if (!await ExtractStageAsync(path, ConflictSide.Base, baseFile))
+            {
+                await File.WriteAllBytesAsync(baseFile, []); // added on both sides: merge against an empty ancestor
+            }
+
+            var run = await ExternalTool.RunAsync(template, new Dictionary<string, string>
+            {
+                [CommandTemplate.Base] = baseFile,
+                [CommandTemplate.Local] = local,
+                [CommandTemplate.Remote] = remote,
+                [CommandTemplate.Merged] = merged,
+            }, ct);
+
+            if (!run.Started)
+            {
+                return new ToolMergeOutcome(false, run.StartError);
+            }
+
+            if (!run.Succeeded || !File.Exists(merged))
+            {
+                return new ToolMergeOutcome(false, "The merge tool was closed without saving a resolved result; the file is still conflicted.");
+            }
+
+            File.Copy(merged, ResolvePath(path), overwrite: true);
+            await _git.OutAsync("add", "--", path);
+            return new ToolMergeOutcome(true, null);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    /// <summary>Which two versions of a file to put side by side in a diff tool.</summary>
+    public enum DiffTarget { Unstaged, Staged, Commit }
+
+    /// <summary>Opens the old and new version of one file in an external diff tool (waits for it to exit).</summary>
+    public async Task<ToolMergeOutcome> DiffWithToolAsync(string path, DiffTarget target, string? commitSha, string template, CancellationToken ct = default)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "gxc-diff-" + Guid.NewGuid().ToString("N")[..10]);
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var name = Path.GetFileName(path);
+            var (left, right) = (Path.Combine(dir, "old_" + name), Path.Combine(dir, "new_" + name));
+            switch (target)
+            {
+                case DiffTarget.Unstaged:
+                    await ExtractBlobAsync("", path, left);        // ":path" = index version
+                    File.Copy(ResolvePath(path), right, true);
+                    break;
+                case DiffTarget.Staged:
+                    await ExtractBlobAsync("HEAD", path, left);
+                    await ExtractBlobAsync("", path, right);
+                    break;
+                default:
+                    var sha = commitSha ?? throw new ArgumentNullException(nameof(commitSha));
+                    var hasParent = (await _git.RunAsync("rev-parse", "--verify", "--quiet", sha + "^1")).Success;
+                    if (hasParent) { await ExtractBlobAsync(sha + "^1", path, left); } else { await File.WriteAllBytesAsync(left, []); }
+                    await ExtractBlobAsync(sha, path, right);
+                    break;
+            }
+
+            var run = await ExternalTool.RunAsync(template, new Dictionary<string, string>
+            {
+                [CommandTemplate.Local] = left,
+                [CommandTemplate.Remote] = right,
+            }, ct);
+            return new ToolMergeOutcome(run.Started, run.StartError);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    public string ResolvePath(string relative) => Path.Combine(Root, relative.Replace('/', Path.DirectorySeparatorChar));
+
+    public Task CherryPickAsync(string sha) => _git.OutAsync("cherry-pick", sha);
+
+    /// <summary>Reverts a commit; merge commits are reverted against their first parent.</summary>
+    public async Task RevertAsync(string sha)
+    {
+        var parents = (await _git.OutAsync("rev-list", "--parents", "-n", "1", sha)).Split(' ', StringSplitOptions.RemoveEmptyEntries).Length - 1;
+        await (parents > 1 ? _git.OutAsync("revert", "--no-edit", "-m", "1", sha) : _git.OutAsync("revert", "--no-edit", sha));
+    }
+
+    public Task ResetAsync(string sha, ResetMode mode)
+        => _git.OutAsync("reset", mode switch { ResetMode.Soft => "--soft", ResetMode.Hard => "--hard", _ => "--mixed" }, sha);
+
+}
+
+public sealed record ToolMergeOutcome(bool Success, string? Message);
+
+public enum ResetMode { Soft, Mixed, Hard }
+
+public enum MergeMode { Default, NoFastForward, FastForwardOnly, Squash }

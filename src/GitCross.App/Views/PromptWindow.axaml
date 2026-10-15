@@ -1,0 +1,14 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="GitCross.App.Views.PromptWindow"
+        Width="460" SizeToContent="Height" CanResize="False" WindowStartupLocation="CenterOwner">
+  <StackPanel Margin="22" Spacing="12">
+    <TextBlock x:Name="Heading" FontSize="18" FontWeight="Bold" TextWrapping="Wrap" />
+    <TextBlock x:Name="Message" TextWrapping="Wrap" Classes="muted" />
+    <TextBox x:Name="Input" IsVisible="False" />
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+      <Button Content="Cancel" Click="OnCancel" />
+      <Button x:Name="Ok" Classes="accent" Padding="18,6" Click="OnOk" IsDefault="True" />
+    </StackPanel>
+  </StackPanel>
+</Window>

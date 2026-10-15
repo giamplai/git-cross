@@ -1,0 +1,69 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="GitCross.App.Views.SettingsWindow"
+        Title="Settings" Width="580" SizeToContent="Height" CanResize="False" WindowStartupLocation="CenterOwner">
+  <StackPanel Margin="24" Spacing="18">
+    <TextBlock Text="Settings" FontSize="22" FontWeight="Bold" />
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="GIT" Classes="section" />
+      <TextBlock Text="Git executable (leave empty to use “git” from your PATH)" Classes="muted" FontSize="12" />
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="Browse…" Margin="8,0,0,0" Click="OnBrowseGit" />
+        <Button DockPanel.Dock="Right" Content="Test" Margin="8,0,0,0" Click="OnTestGit" />
+        <TextBox x:Name="GitPathBox" PlaceholderText="git" />
+      </DockPanel>
+      <TextBlock x:Name="GitStatusText" FontSize="12" />
+    </StackPanel>
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="IDENTITY (global git config)" Classes="section" />
+      <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto" RowSpacing="8">
+        <TextBlock Text="Name" VerticalAlignment="Center" />
+        <TextBox x:Name="NameBox" Grid.Column="1" PlaceholderText="Your Name" />
+        <TextBlock Grid.Row="1" Text="Email" VerticalAlignment="Center" />
+        <TextBox x:Name="EmailBox" Grid.Row="1" Grid.Column="1" PlaceholderText="you@example.com" />
+      </Grid>
+      <TextBlock Text="Used for the author of your commits in every repository (unless a repository overrides it)." Classes="muted" FontSize="12" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="EXTERNAL TOOLS" Classes="section" />
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Left" Text="Preset" Width="90" VerticalAlignment="Center" />
+        <ComboBox x:Name="PresetBox" Width="180" />
+      </DockPanel>
+      <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
+        <TextBlock Text="Merge tool" VerticalAlignment="Center" />
+        <TextBox x:Name="MergeBox" Grid.Column="1" PlaceholderText="command using $BASE $LOCAL $REMOTE $MERGED" />
+        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="MergeStatus" FontSize="12" />
+        <TextBlock Grid.Row="2" Text="Diff tool" VerticalAlignment="Center" />
+        <TextBox x:Name="DiffBox" Grid.Row="2" Grid.Column="1" PlaceholderText="command using $LOCAL $REMOTE" />
+        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="DiffStatus" FontSize="12" />
+      </Grid>
+      <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                 Text="Used from the right-click menu of conflicted and changed files. The command is run without a shell; $LOCAL is your side (ours), $REMOTE the incoming side (theirs)." />
+    </StackPanel>
+
+    <StackPanel Spacing="8">
+      <TextBlock Text="BEHAVIOR" Classes="section" />
+      <CheckBox x:Name="PullRebaseBox" Content="Pull with rebase (the Pull button replays local commits instead of merging)" />
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <TextBlock Text="Commits loaded in History" VerticalAlignment="Center" />
+        <ComboBox x:Name="MaxCommitsBox" Width="110" />
+      </StackPanel>
+    </StackPanel>
+
+    <TextBlock x:Name="ErrorText" Foreground="#E5484D" TextWrapping="Wrap" IsVisible="False" />
+    <DockPanel>
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+        <Button Content="Cancel" Click="OnCancel" />
+        <Button Classes="accent" Content="Save" Padding="22,6" Click="OnSave" IsDefault="True" />
+      </StackPanel>
+      <StackPanel VerticalAlignment="Center" Spacing="1">
+        <TextBlock x:Name="VersionText" Classes="muted" FontSize="12" />
+        <TextBlock x:Name="CreditText" Classes="muted" FontSize="11" Opacity="0.85" />
+      </StackPanel>
+    </DockPanel>
+  </StackPanel>
+</Window>

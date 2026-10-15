@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: "/"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 2
+    groups:
+      nuget-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # major versions (test framework, SDKs, UI toolkit) change APIs: upgrade them deliberately, not automatically
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 2
+    groups:
+      actions:
+        patterns: ["*"]
