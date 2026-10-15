@@ -9,8 +9,8 @@ jobs:
       matrix: { os: [ubuntu-latest, windows-latest, macos-latest] }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with: { global-json-file: global.json }
       - run: dotnet build -c Release
       - run: dotnet test tests/GitCross.Core.Tests -c Release --no-build
@@ -19,7 +19,7 @@ jobs:
     # headless rendering tests; Linux only (they also verify the documentation screenshots can be produced)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with: { global-json-file: global.json }
       - run: dotnet test tests/GitCross.App.UiTests -c Release
