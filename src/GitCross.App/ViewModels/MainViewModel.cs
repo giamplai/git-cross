@@ -28,6 +28,7 @@ public partial class MainViewModel : ObservableObject
     private IReadOnlyList<GitRef> _refs = [];
     private IReadOnlyList<StashEntry> _stashes = [];
     private IReadOnlyList<SubmoduleInfo> _submodules = [];
+    private IReadOnlyDictionary<string, SubmoduleLiveStatus> _subLive = new Dictionary<string, SubmoduleLiveStatus>();
     private readonly Stack<string> _parents = new(); // superprojects we descended from; lets "Back" return
     private string? _fileFilter; // when set, history lists only commits touching this file
     private string? _detailSha; // commit or stash whose files are listed
@@ -388,6 +389,7 @@ public partial class MainViewModel : ObservableObject
             var subTask = repo.GetSubmodulesAsync();
             await Task.WhenAll(commitsTask, refsTask, statusTask, stashTask, subTask);
             _submodules = subTask.Result;
+            _subLive = _submodules.Count > 0 ? await repo.GetSubmoduleLiveStatusesAsync() : _subLive;
             var (commits, refs, status) = (commitsTask.Result, refsTask.Result, statusTask.Result);
             _stashes = stashTask.Result;
             var op = await repo.GetOperationAsync();
@@ -495,7 +497,7 @@ public partial class MainViewModel : ObservableObject
             Sidebar.Add(new SidebarEntry("SUBMODULES", IsHeader: true, Count: _submodules.Count.ToString()));
             foreach (var m in _submodules)
             {
-                Sidebar.Add(new SidebarEntry(m.Path, Submodule: m));
+                Sidebar.Add(new SidebarEntry(m.Path, Submodule: m, Live: _subLive.GetValueOrDefault(m.Path)));
             }
         }
 
@@ -1198,6 +1200,14 @@ public partial class MainViewModel : ObservableObject
             return done.Count == 0 ? "Nothing to commit." : $"Committed in: {string.Join(", ", done)}.";
         });
     }
+
+    /// <summary>Pulls the submodules and then this repository, after checking all of them (clean trees, upstream, predicted conflicts).</summary>
+    public Task PullEverywhereAsync()
+        => SyncOpAsync(async r =>
+        {
+            var done = await r.PullEverywhereAsync(_settings.PullRebase);
+            return done.Count == 0 ? "Everything is already up to date." : $"Pulled: {string.Join(", ", done)}.";
+        });
 
     /// <summary>Pushes the submodules and then this repository, after checking all of them (fetch, behind, dry-run).</summary>
     public Task PushEverywhereAsync()

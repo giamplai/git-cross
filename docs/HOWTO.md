@@ -361,6 +361,8 @@ A submodule is another git repository nested inside yours at a fixed commit. Whe
 | ↻ | **Modified** — the submodule is checked out at a different commit than the one recorded (it has new commits, or you moved it). The change shows up as a modified file in the **Commit** tab; stage and commit it to record the new commit. |
 | ⚠ | **Conflicted** — the submodule entry has a merge conflict. |
 
+Next to each initialized submodule the sidebar shows its live state: the branch it is on (or *detached*), `↑N`/`↓M` commits ahead/behind its upstream, and `●` when it has uncommitted changes. Spot a *detached* one before you start editing.
+
 What you can do:
 
 * **Double-click** a submodule (or right-click → **Open submodule repository**) to open it as a repository in its own right: you can browse its history, commit, branch and push there. A **◀ Back to …** button appears at the left of the toolbar to return to the repository you came from. Submodules you open this way are not added to the *Recent* list.
@@ -377,6 +379,7 @@ Right-click the **SUBMODULES** header for operations that act on the repository 
 | **Create branch on repository and all submodules…** | Creates the branch at the current commit of each repository and checks it out everywhere. | the name is invalid or exists in any repository, a submodule is not initialized, a merge/rebase is in progress. |
 | **Check out this branch in all submodules** | Puts every submodule on the branch the top repository is on, instead of the detached recorded commit. Uses the local branch, or creates a tracking branch from the remote one; if the branch is just behind the recorded commit it is fast-forwarded, so the recorded commit is kept. | a submodule has no such branch (local or remote), a submodule is not initialized. |
 | **Commit all (submodules first)…** | Stages everything and commits with the same message in each repository that has changes, deepest submodule first, so the parent records the new submodule commits in the same step. If a commit fails the ones already made are undone (changes stay staged). | empty message, unresolved conflicts, a repository with changes is on a detached HEAD, git user name/email missing. |
+| **Pull all (submodules first)** | Fetches every repository, then pulls the ones that are behind (merge or rebase as set in Settings), submodules first. If a step still fails, repositories already pulled are put back, so you are never left half updated. | an uncommitted change anywhere (commit or stash first), a detached HEAD, a branch without upstream, or a merge that would conflict (predicted with a trial merge that writes nothing). |
 | **Push all (submodules first)** | Fetches every repository, then pushes the ones that are ahead (or have no upstream, which is set to `origin`), submodules before the parent so the parent never points at unpublished commits. | a repository is behind its upstream (pull first), the remote is unreachable, or a dry-run push shows the remote would reject it. |
 
 Tips: after a plain clone submodules are detached, so run **Check out this branch in all submodules** (or create the branch everywhere) before editing and committing. If a push fails after some repositories were already pushed, the message lists exactly what went out; fix the cause and push again.

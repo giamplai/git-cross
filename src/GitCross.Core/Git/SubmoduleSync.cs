@@ -9,6 +9,9 @@ public sealed record SyncProblem(string Repo, string Message)
     public override string ToString() => $"{Repo}: {Message}";
 }
 
+/// <summary>Live state of one submodule: branch (null = detached), commits ahead/behind its upstream, uncommitted changes.</summary>
+public sealed record SubmoduleLiveStatus(string Path, string? Branch, int Ahead, int Behind, bool Dirty);
+
 /// <summary>A repository taking part in a coordinated operation: <see cref="Path"/> is relative to the top repository ("." for itself).</summary>
 public sealed record SyncMember(string Path, GitRepository Repo)
 {
@@ -381,5 +384,120 @@ public sealed partial class GitRepository
         }
 
         return pushed;
+    }
+
+    // ───────── live state of the direct submodules ─────────
+
+    /// <summary>Branch, ahead/behind and dirtiness of each initialized direct submodule, by path.</summary>
+    public async Task<IReadOnlyDictionary<string, SubmoduleLiveStatus>> GetSubmoduleLiveStatusesAsync()
+    {
+        var result = new Dictionary<string, SubmoduleLiveStatus>();
+        foreach (var sub in await GetSubmodulesAsync())
+        {
+            if (sub.IsInitialized && await OpenAsync(SubmoduleFullPath(sub)) is { } child)
+            {
+                var st = await child.GetStatusAsync();
+                result[sub.Path] = new SubmoduleLiveStatus(sub.Path, st.Branch, st.Ahead, st.Behind, st.Staged.Count + st.Unstaged.Count > 0);
+            }
+        }
+
+        return result;
+    }
+
+    // ───────── one pull everywhere ─────────
+
+    /// <summary>
+    /// Why <see cref="PullEverywhereAsync"/> would fail, without changing anything: fetches every repository, then requires clean
+    /// work trees, a branch with an upstream, and (for merge) predicts conflicts with a trial merge that writes nothing.
+    /// </summary>
+    public async Task<IReadOnlyList<SyncProblem>> CheckPullEverywhereAsync(bool rebase)
+    {
+        var members = await GetSyncMembersAsync();
+        var problems = await BaselineProblemsAsync(members, needInitialized: false);
+        foreach (var m in members)
+        {
+            var fetched = await m.Repo._git.RunAsync(["fetch", "--all", "--prune"], null, default);
+            if (!fetched.Success)
+            {
+                problems.Add(new SyncProblem(m.Path, "cannot reach the remote: " + fetched.StdErr.Trim()));
+                continue;
+            }
+
+            var status = await m.Repo.GetStatusAsync();
+            if (status.Staged.Count + status.Unstaged.Count > 0)
+            {
+                problems.Add(new SyncProblem(m.Path, "has uncommitted changes: commit or stash them first"));
+                continue;
+            }
+
+            if (status.Branch is null)
+            {
+                problems.Add(new SyncProblem(m.Path, "HEAD is detached: check out a branch first"));
+                continue;
+            }
+
+            if (!(await m.Repo._git.RunAsync(["rev-parse", "--abbrev-ref", "@{u}"], null, default)).Success)
+            {
+                problems.Add(new SyncProblem(m.Path, $"branch '{status.Branch}' has no upstream"));
+                continue;
+            }
+
+            if (!rebase && status.Behind > 0 && status.Ahead > 0
+                && !(await m.Repo._git.RunAsync(["merge-tree", "--write-tree", "HEAD", "@{u}"], null, default)).Success)
+            {
+                problems.Add(new SyncProblem(m.Path, "merging the upstream would conflict"));
+            }
+        }
+
+        return problems;
+    }
+
+    /// <summary>
+    /// Pulls every repository that is behind, submodules first. Work trees must be clean, so a failure part way is fully undone
+    /// (repositories already pulled go back to where they were). Returns "path (N commits)" for each updated repository.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> PullEverywhereAsync(bool rebase = false)
+    {
+        if (await CheckPullEverywhereAsync(rebase) is { Count: > 0 } problems)
+        {
+            throw new SyncPreflightException(problems);
+        }
+
+        var pulled = new List<(SyncMember M, string Before)>();
+        var report = new List<string>();
+        foreach (var m in await GetSyncMembersAsync())
+        {
+            var behind = (await m.Repo.GetStatusAsync()).Behind;
+            if (behind == 0)
+            {
+                continue;
+            }
+
+            var before = await m.Repo.HeadShaAsync();
+            try
+            {
+                await m.Repo.PullAsync(rebase);
+            }
+            catch (GitException ex)
+            {
+                if (await m.Repo.GetOperationAsync() is var op and not GitOperation.None)
+                {
+                    await m.Repo.AbortAsync(op);
+                }
+
+                await m.Repo._git.RunAsync(["reset", "--hard", before], null, default);
+                foreach (var (done, sha) in pulled.AsEnumerable().Reverse())
+                {
+                    await done.Repo._git.RunAsync(["reset", "--hard", sha], null, default);
+                }
+
+                throw new InvalidOperationException($"Pull failed in {m.Path}: {ex.Message}\nEverything was put back as it was before.", ex);
+            }
+
+            pulled.Add((m, before));
+            report.Add($"{m.Path} ({behind} commit{(behind == 1 ? "" : "s")})");
+        }
+
+        return report;
     }
 }

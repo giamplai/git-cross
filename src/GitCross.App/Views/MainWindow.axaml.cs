@@ -235,6 +235,8 @@ public partial class MainWindow : Window
 
     private async void OnSubmoduleCommitAll(object? s, RoutedEventArgs e) => await _vm.CommitEverywhereAsync();
 
+    private async void OnSubmodulePullAll(object? s, RoutedEventArgs e) => await _vm.PullEverywhereAsync();
+
     private async void OnSubmodulePushAll(object? s, RoutedEventArgs e) => await _vm.PushEverywhereAsync();
 
     private static Core.Models.StashEntry? StashOf(object? sender)

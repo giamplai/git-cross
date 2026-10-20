@@ -162,4 +162,46 @@ public class SubmoduleSyncTests
         Assert.Contains(problems, p => p.Repo == "." && p.Message.Contains("behind"));
         await Assert.ThrowsAsync<SyncPreflightException>(() => w.Super.PushEverywhereAsync());
     }
+
+    [Fact]
+    public async Task Pull_everywhere_updates_submodule_and_parent_and_live_status_reports_it()
+    {
+        using var _ = new SubmoduleTests.FileTransportScope();
+        using var w = await World.CreateAsync();
+        await w.Super.CheckoutAsync("main");
+        var lib = await w.LibAsync();
+        await lib.CheckoutAsync("main");
+        Assert.Equal("main", (await w.Super.GetSubmoduleLiveStatusesAsync())["libs/lib"].Branch);
+
+        w.LibSeed.Write("a.txt", "2\n"); await (await GitRepository.OpenAsync(w.LibSeed.Path))!.StageAsync(["a.txt"]);
+        w.LibSeed.Git("commit", "-q", "-m", "lib 2"); w.LibSeed.Git("push", "-q");
+        var (other, o) = await TempRepo.CloneAsync(Path.Combine(w.Holder.Path, "super.git"));
+        using (other)
+        {
+            other.Write("o.txt", "x\n"); await o.StageAsync(["o.txt"]); await o.CommitAsync("theirs");
+            other.Git("push", "-q");
+        }
+
+        Assert.Empty(await w.Super.CheckPullEverywhereAsync(rebase: false));
+        var pulled = await w.Super.PullEverywhereAsync();
+
+        Assert.Equal(["libs/lib (1 commit)", ". (1 commit)"], pulled);
+        Assert.Equal("2\n", File.ReadAllText(Path.Combine(w.LibPath, "a.txt")));
+        Assert.True(File.Exists(Path.Combine(w.Local.Path, "o.txt")));
+        Assert.Equal(0, (await w.Super.GetSubmoduleLiveStatusesAsync())["libs/lib"].Behind);
+    }
+
+    [Fact]
+    public async Task Pull_everywhere_refuses_dirty_and_detached_repositories()
+    {
+        using var _ = new SubmoduleTests.FileTransportScope();
+        using var w = await World.CreateAsync();
+        w.Local.Write("s.txt", "dirty\n");
+
+        var problems = await w.Super.CheckPullEverywhereAsync(rebase: false);
+
+        Assert.Contains(problems, p => p.Repo == "libs/lib" && p.Message.Contains("detached"));
+        Assert.Contains(problems, p => p.Repo == "." && p.Message.Contains("uncommitted"));
+        await Assert.ThrowsAsync<SyncPreflightException>(() => w.Super.PullEverywhereAsync());
+    }
 }
