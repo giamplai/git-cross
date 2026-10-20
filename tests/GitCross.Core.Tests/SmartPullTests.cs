@@ -16,6 +16,9 @@ public class SmartPullTests
         return (origin, local, r);
     }
 
+    /// <summary>File content with line endings normalized (Windows checkouts may apply autocrlf).</summary>
+    private static string Text(string path) => File.ReadAllText(path).Replace("\r\n", "\n");
+
     private static void Commit(TempRepo t, string message)
     {
         t.Git("add", "-A");
@@ -49,7 +52,7 @@ public class SmartPullTests
             s = await r.GetStatusAsync();
             Assert.Equal(["a.txt"], s.Staged.Select(f => f.Path));
             Assert.Equal(["b.txt", "new.txt"], s.Unstaged.Select(f => f.Path).Order());
-            Assert.Equal("a\nstaged\n", File.ReadAllText(Path.Combine(local.Path, "a.txt")));
+            Assert.Equal("a\nstaged\n", Text(Path.Combine(local.Path, "a.txt")));
             Assert.Null(await r.GetSmartPullStateAsync());
         }
     }
@@ -93,7 +96,7 @@ public class SmartPullTests
             Assert.Contains((await r.GetStatusAsync()).Unstaged, f => f.Kind == ChangeKind.Conflicted);
 
             await r.UndoSmartPullAsync();
-            Assert.Equal("from my wip\n", File.ReadAllText(Path.Combine(local.Path, "a.txt")));
+            Assert.Equal("from my wip\n", Text(Path.Combine(local.Path, "a.txt")));
             Assert.DoesNotContain((await r.GetStatusAsync()).Unstaged, f => f.Kind == ChangeKind.Conflicted);
         }
     }
@@ -119,7 +122,7 @@ public class SmartPullTests
 
             await r.UndoSmartPullAsync();
             Assert.Equal(before, (await r.GetLogAsync(all: false))[0].Sha);
-            Assert.Equal("b\nwip\n", File.ReadAllText(Path.Combine(local.Path, "b.txt")));
+            Assert.Equal("b\nwip\n", Text(Path.Combine(local.Path, "b.txt")));
         }
     }
 
@@ -146,7 +149,7 @@ public class SmartPullTests
             t.Write("a.txt", "a\n"); await r.StageAsync(["a.txt"]); await r.CommitAsync("base");
             t.Write("a.txt", "a\nwip\n");
             await Assert.ThrowsAsync<GitException>(() => r.SmartPullAsync()); // no remote/upstream
-            Assert.Equal("a\nwip\n", File.ReadAllText(Path.Combine(t.Path, "a.txt")));
+            Assert.Equal("a\nwip\n", Text(Path.Combine(t.Path, "a.txt")));
             Assert.Null(await r.GetSmartPullStateAsync());
         }
     }
