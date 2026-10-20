@@ -2,6 +2,8 @@ using GitCross.Core.Git;
 
 namespace GitCross.Core.Tests;
 
+// Both classes set process-wide environment variables (FileTransportScope): they must not run in parallel.
+[Collection("process-environment")]
 public class SubmoduleSyncTests
 {
     /// <summary>Bare remotes for a library and a superproject, plus a local clone of the superproject with its submodule initialized (detached, as git leaves it).</summary>
@@ -137,7 +139,7 @@ public class SubmoduleSyncTests
 
         Assert.Contains(problems, p => p.Repo == "libs/lib" && p.Message.Contains("detached"));
         await Assert.ThrowsAsync<SyncPreflightException>(() => w.Super.CommitEverywhereAsync("msg"));
-        Assert.Equal("2\n", File.ReadAllText(Path.Combine(w.Local.Path, "s.txt"))); // untouched
+        Assert.Equal("2\n", Text(Path.Combine(w.Local.Path, "s.txt"))); // untouched
         Assert.Single((await w.Super.GetStatusAsync()).Unstaged, f => f.Path == "s.txt");
     }
 
@@ -176,6 +178,9 @@ public class SubmoduleSyncTests
         }
     }
 
+    /// <summary>File content with line endings normalized (Windows checkouts may apply autocrlf).</summary>
+    private static string Text(string path) => File.ReadAllText(path).Replace("\r\n", "\n");
+
     private static async Task<string> Head(GitRepository r) => (await r.GetLogAsync(all: false))[0].Sha;
 
     private static async Task<GitRepository> OnMainAsync(World w)
@@ -203,18 +208,18 @@ public class SubmoduleSyncTests
         var steps = await w.Super.PullEverywhereAsync();
 
         Assert.Equal([("libs/lib", 1, SmartPullOutcome.Clean), (".", 1, SmartPullOutcome.Clean)], steps.Select(s => (s.Path, s.Commits, s.Outcome)));
-        Assert.Equal("2\n", File.ReadAllText(Path.Combine(w.LibPath, "a.txt")));
+        Assert.Equal("2\n", Text(Path.Combine(w.LibPath, "a.txt")));
         Assert.True(File.Exists(Path.Combine(w.Local.Path, "o.txt")));
-        Assert.Equal("lib wip\n", File.ReadAllText(Path.Combine(w.LibPath, "wip.txt")));
-        Assert.Equal("super wip\n", File.ReadAllText(Path.Combine(w.Local.Path, "s.txt")));
+        Assert.Equal("lib wip\n", Text(Path.Combine(w.LibPath, "wip.txt")));
+        Assert.Equal("super wip\n", Text(Path.Combine(w.Local.Path, "s.txt")));
         Assert.Equal(2, (await w.Super.GetSyncStatesAsync()).Count);
 
         await w.Super.UndoEverywhereAsync();
 
         Assert.Equal(libBefore, await Head(lib));
         Assert.Equal(superBefore, await Head(w.Super));
-        Assert.Equal("lib wip\n", File.ReadAllText(Path.Combine(w.LibPath, "wip.txt")));
-        Assert.Equal("super wip\n", File.ReadAllText(Path.Combine(w.Local.Path, "s.txt")));
+        Assert.Equal("lib wip\n", Text(Path.Combine(w.LibPath, "wip.txt")));
+        Assert.Equal("super wip\n", Text(Path.Combine(w.Local.Path, "s.txt")));
         Assert.False(File.Exists(Path.Combine(w.Local.Path, "o.txt")));
         Assert.Empty(await w.Super.GetSyncStatesAsync());
     }
@@ -263,7 +268,7 @@ public class SubmoduleSyncTests
         Assert.Contains(problems, p => p.Repo == "libs/lib" && p.Message.Contains("detached"));
         Assert.DoesNotContain(problems, p => p.Repo == ".");
         await Assert.ThrowsAsync<SyncPreflightException>(() => w.Super.PullEverywhereAsync());
-        Assert.Equal("dirty\n", File.ReadAllText(Path.Combine(w.Local.Path, "s.txt")));
+        Assert.Equal("dirty\n", Text(Path.Combine(w.Local.Path, "s.txt")));
         Assert.Empty(await w.Super.GetSyncStatesAsync());
     }
 }

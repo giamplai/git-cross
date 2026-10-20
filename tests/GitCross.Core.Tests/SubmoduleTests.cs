@@ -3,6 +3,8 @@ using GitCross.Core.Submodules;
 
 namespace GitCross.Core.Tests;
 
+// Both classes set process-wide environment variables (FileTransportScope): they must not run in parallel.
+[Collection("process-environment")]
 public class SubmoduleTests
 {
     private const string Sha = "36a827c287fe147d0b589d2e666657fef28be6d0";
