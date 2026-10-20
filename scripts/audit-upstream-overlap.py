@@ -19,7 +19,8 @@ TRIVIAL = re.compile(r'^([{}()\[\];,]|else|try|\*/|/\*\*|//.*|using .*|namespace
 
 def files(root, exts):
     for dp, _, fn in os.walk(root):
-        if any(s in dp for s in SKIP):
+        # Judge the folder relative to the scanned root: the upstream checkout itself lives under /external.
+        if any(s in '/' + os.path.relpath(dp, root).replace(os.sep, '/') for s in SKIP):
             continue
         for f in fn:
             if f.endswith(exts):
