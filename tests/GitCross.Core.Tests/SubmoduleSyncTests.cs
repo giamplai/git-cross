@@ -163,36 +163,96 @@ public class SubmoduleSyncTests
         await Assert.ThrowsAsync<SyncPreflightException>(() => w.Super.PushEverywhereAsync());
     }
 
-    [Fact]
-    public async Task Pull_everywhere_updates_submodule_and_parent_and_live_status_reports_it()
+    /// <summary>Advances both remotes: the library gets a commit on main, the superproject gets an unrelated one.</summary>
+    private static async Task AdvanceRemotesAsync(World w)
     {
-        using var _ = new SubmoduleTests.FileTransportScope();
-        using var w = await World.CreateAsync();
-        await w.Super.CheckoutAsync("main");
-        var lib = await w.LibAsync();
-        await lib.CheckoutAsync("main");
-        Assert.Equal("main", (await w.Super.GetSubmoduleLiveStatusesAsync())["libs/lib"].Branch);
-
-        w.LibSeed.Write("a.txt", "2\n"); await (await GitRepository.OpenAsync(w.LibSeed.Path))!.StageAsync(["a.txt"]);
-        w.LibSeed.Git("commit", "-q", "-m", "lib 2"); w.LibSeed.Git("push", "-q");
+        w.LibSeed.Write("a.txt", "2\n");
+        w.LibSeed.Git("add", "-A"); w.LibSeed.Git("commit", "-q", "-m", "lib 2"); w.LibSeed.Git("push", "-q");
         var (other, o) = await TempRepo.CloneAsync(Path.Combine(w.Holder.Path, "super.git"));
         using (other)
         {
             other.Write("o.txt", "x\n"); await o.StageAsync(["o.txt"]); await o.CommitAsync("theirs");
             other.Git("push", "-q");
         }
+    }
 
-        Assert.Empty(await w.Super.CheckPullEverywhereAsync(rebase: false));
-        var pulled = await w.Super.PullEverywhereAsync();
+    private static async Task<string> Head(GitRepository r) => (await r.GetLogAsync(all: false))[0].Sha;
 
-        Assert.Equal(["libs/lib (1 commit)", ". (1 commit)"], pulled);
-        Assert.Equal("2\n", File.ReadAllText(Path.Combine(w.LibPath, "a.txt")));
-        Assert.True(File.Exists(Path.Combine(w.Local.Path, "o.txt")));
-        Assert.Equal(0, (await w.Super.GetSubmoduleLiveStatusesAsync())["libs/lib"].Behind);
+    private static async Task<GitRepository> OnMainAsync(World w)
+    {
+        await w.Super.CheckoutAsync("main");
+        var lib = await w.LibAsync();
+        await lib.CheckoutAsync("main");
+        return lib;
     }
 
     [Fact]
-    public async Task Pull_everywhere_refuses_dirty_and_detached_repositories()
+    public async Task Pull_everywhere_keeps_wip_in_both_repositories_and_undo_restores_all()
+    {
+        using var _ = new SubmoduleTests.FileTransportScope();
+        using var w = await World.CreateAsync();
+        var lib = await OnMainAsync(w);
+        Assert.Equal("main", (await w.Super.GetSubmoduleLiveStatusesAsync())["libs/lib"].Branch);
+        var libBefore = await Head(lib);
+        var superBefore = await Head(w.Super);
+        await AdvanceRemotesAsync(w);
+        File.WriteAllText(Path.Combine(w.LibPath, "wip.txt"), "lib wip\n");
+        w.Local.Write("s.txt", "super wip\n");
+
+        Assert.Empty(await w.Super.CheckPullEverywhereAsync(rebase: false));
+        var steps = await w.Super.PullEverywhereAsync();
+
+        Assert.Equal([("libs/lib", 1, SmartPullOutcome.Clean), (".", 1, SmartPullOutcome.Clean)], steps.Select(s => (s.Path, s.Commits, s.Outcome)));
+        Assert.Equal("2\n", File.ReadAllText(Path.Combine(w.LibPath, "a.txt")));
+        Assert.True(File.Exists(Path.Combine(w.Local.Path, "o.txt")));
+        Assert.Equal("lib wip\n", File.ReadAllText(Path.Combine(w.LibPath, "wip.txt")));
+        Assert.Equal("super wip\n", File.ReadAllText(Path.Combine(w.Local.Path, "s.txt")));
+        Assert.Equal(2, (await w.Super.GetSyncStatesAsync()).Count);
+
+        await w.Super.UndoEverywhereAsync();
+
+        Assert.Equal(libBefore, await Head(lib));
+        Assert.Equal(superBefore, await Head(w.Super));
+        Assert.Equal("lib wip\n", File.ReadAllText(Path.Combine(w.LibPath, "wip.txt")));
+        Assert.Equal("super wip\n", File.ReadAllText(Path.Combine(w.Local.Path, "s.txt")));
+        Assert.False(File.Exists(Path.Combine(w.Local.Path, "o.txt")));
+        Assert.Empty(await w.Super.GetSyncStatesAsync());
+    }
+
+    [Fact]
+    public async Task Keep_everywhere_forgets_all_undo_points()
+    {
+        using var _ = new SubmoduleTests.FileTransportScope();
+        using var w = await World.CreateAsync();
+        await OnMainAsync(w);
+        await AdvanceRemotesAsync(w);
+        await w.Super.PullEverywhereAsync();
+
+        await w.Super.KeepEverywhereAsync();
+
+        Assert.Empty(await w.Super.GetSyncStatesAsync());
+    }
+
+    [Fact]
+    public async Task Undo_everywhere_is_refused_when_one_repository_got_new_commits()
+    {
+        using var _ = new SubmoduleTests.FileTransportScope();
+        using var w = await World.CreateAsync();
+        var lib = await OnMainAsync(w);
+        await AdvanceRemotesAsync(w);
+        await w.Super.PullEverywhereAsync();
+        File.WriteAllText(Path.Combine(w.LibPath, "later.txt"), "x\n");
+        await lib.StageAsync(["later.txt"]); await lib.CommitAsync("later");
+
+        var problems = await w.Super.CheckUndoEverywhereAsync();
+
+        Assert.Equal(["libs/lib"], problems.Select(p => p.Repo));
+        await Assert.ThrowsAsync<SyncPreflightException>(() => w.Super.UndoEverywhereAsync());
+        Assert.Equal(2, (await w.Super.GetSyncStatesAsync()).Count); // nothing was touched
+    }
+
+    [Fact]
+    public async Task Pull_everywhere_refuses_detached_repositories_and_changes_nothing()
     {
         using var _ = new SubmoduleTests.FileTransportScope();
         using var w = await World.CreateAsync();
@@ -201,7 +261,9 @@ public class SubmoduleSyncTests
         var problems = await w.Super.CheckPullEverywhereAsync(rebase: false);
 
         Assert.Contains(problems, p => p.Repo == "libs/lib" && p.Message.Contains("detached"));
-        Assert.Contains(problems, p => p.Repo == "." && p.Message.Contains("uncommitted"));
+        Assert.DoesNotContain(problems, p => p.Repo == ".");
         await Assert.ThrowsAsync<SyncPreflightException>(() => w.Super.PullEverywhereAsync());
+        Assert.Equal("dirty\n", File.ReadAllText(Path.Combine(w.Local.Path, "s.txt")));
+        Assert.Empty(await w.Super.GetSyncStatesAsync());
     }
 }

@@ -404,11 +404,30 @@ public sealed partial class GitRepository
         return result;
     }
 
-    // ───────── one pull everywhere ─────────
+    // ───────── one pull everywhere (keeping work in progress) ─────────
+
+    /// <summary>What <see cref="PullEverywhereAsync"/> did in one repository.</summary>
+    public sealed record SyncPullStep(string Path, int Commits, SmartPullOutcome Outcome);
+
+    /// <summary>Undo points of the last coordinated pull, deepest repository first. Empty when there is none.</summary>
+    public async Task<IReadOnlyList<(SyncMember Member, SmartPullState State)>> GetSyncStatesAsync()
+    {
+        var list = new List<(SyncMember, SmartPullState)>();
+        foreach (var m in await GetSyncMembersAsync())
+        {
+            if (await m.Repo.GetSmartPullStateAsync() is { } st)
+            {
+                list.Add((m, st));
+            }
+        }
+
+        return list;
+    }
 
     /// <summary>
-    /// Why <see cref="PullEverywhereAsync"/> would fail, without changing anything: fetches every repository, then requires clean
-    /// work trees, a branch with an upstream, and (for merge) predicts conflicts with a trial merge that writes nothing.
+    /// Why <see cref="PullEverywhereAsync"/> would fail, without changing anything: fetches every repository, then requires a branch with
+    /// an upstream, no conflicts or paused operation, no unfinished earlier sync, and (for merge) predicts conflicts with a trial merge
+    /// that writes nothing. Uncommitted changes are fine: they are parked and re-applied.
     /// </summary>
     public async Task<IReadOnlyList<SyncProblem>> CheckPullEverywhereAsync(bool rebase)
     {
@@ -416,6 +435,11 @@ public sealed partial class GitRepository
         var problems = await BaselineProblemsAsync(members, needInitialized: false);
         foreach (var m in members)
         {
+            if (await m.Repo.GetSmartPullStateAsync() is { IsPending: true })
+            {
+                problems.Add(new SyncProblem(m.Path, "an earlier sync left your changes parked: restore them or undo it first"));
+            }
+
             var fetched = await m.Repo._git.RunAsync(["fetch", "--all", "--prune"], null, default);
             if (!fetched.Success)
             {
@@ -424,9 +448,9 @@ public sealed partial class GitRepository
             }
 
             var status = await m.Repo.GetStatusAsync();
-            if (status.Staged.Count + status.Unstaged.Count > 0)
+            if (status.Unstaged.Any(f => f.Kind == ChangeKind.Conflicted))
             {
-                problems.Add(new SyncProblem(m.Path, "has uncommitted changes: commit or stash them first"));
+                problems.Add(new SyncProblem(m.Path, "unresolved conflicts"));
                 continue;
             }
 
@@ -453,19 +477,29 @@ public sealed partial class GitRepository
     }
 
     /// <summary>
-    /// Pulls every repository that is behind, submodules first. Work trees must be clean, so a failure part way is fully undone
-    /// (repositories already pulled go back to where they were). Returns "path (N commits)" for each updated repository.
+    /// Pulls every repository that is behind, submodules first, parking and re-applying uncommitted work in each one
+    /// (<see cref="SmartPullAsync"/>). Every touched repository keeps an undo point: <see cref="UndoEverywhereAsync"/> restores them all.
+    /// If a step fails, the repositories already pulled are put back, so you are never left half updated.
     /// </summary>
-    public async Task<IReadOnlyList<string>> PullEverywhereAsync(bool rebase = false)
+    public async Task<IReadOnlyList<SyncPullStep>> PullEverywhereAsync(bool rebase = false)
     {
         if (await CheckPullEverywhereAsync(rebase) is { Count: > 0 } problems)
         {
             throw new SyncPreflightException(problems);
         }
 
-        var pulled = new List<(SyncMember M, string Before)>();
-        var report = new List<string>();
-        foreach (var m in await GetSyncMembersAsync())
+        var members = await GetSyncMembersAsync();
+        foreach (var m in members)
+        {
+            if (await m.Repo.GetSmartPullStateAsync() is { IsPending: false })
+            {
+                await m.Repo.DiscardSmartPullAsync(); // a new sync supersedes the previous undo points
+            }
+        }
+
+        var done = new List<SyncMember>();
+        var steps = new List<SyncPullStep>();
+        foreach (var m in members)
         {
             var behind = (await m.Repo.GetStatusAsync()).Behind;
             if (behind == 0)
@@ -473,31 +507,91 @@ public sealed partial class GitRepository
                 continue;
             }
 
-            var before = await m.Repo.HeadShaAsync();
+            SmartPullOutcome outcome;
             try
             {
-                await m.Repo.PullAsync(rebase);
+                outcome = await m.Repo.SmartPullAsync(rebase);
             }
-            catch (GitException ex)
+            catch (Exception ex) when (ex is GitException or InvalidOperationException)
             {
-                if (await m.Repo.GetOperationAsync() is var op and not GitOperation.None)
-                {
-                    await m.Repo.AbortAsync(op);
-                }
-
-                await m.Repo._git.RunAsync(["reset", "--hard", before], null, default);
-                foreach (var (done, sha) in pulled.AsEnumerable().Reverse())
-                {
-                    await done.Repo._git.RunAsync(["reset", "--hard", sha], null, default);
-                }
-
-                throw new InvalidOperationException($"Pull failed in {m.Path}: {ex.Message}\nEverything was put back as it was before.", ex);
+                throw new InvalidOperationException($"Pull failed in {m.Path}: {ex.Message}\n{await RollbackAsync(done)}", ex);
             }
 
-            pulled.Add((m, before));
-            report.Add($"{m.Path} ({behind} commit{(behind == 1 ? "" : "s")})");
+            done.Add(m);
+            if (outcome == SmartPullOutcome.PullConflicts)
+            {
+                throw new InvalidOperationException($"The pull conflicted in {m.Path}.\n{await RollbackAsync(done)}");
+            }
+
+            steps.Add(new SyncPullStep(m.Path, behind, outcome));
         }
 
-        return report;
+        return steps;
+    }
+
+    private static async Task<string> RollbackAsync(List<SyncMember> done)
+    {
+        var failed = new List<string>();
+        foreach (var m in Enumerable.Reverse(done))
+        {
+            try
+            {
+                await m.Repo.UndoSmartPullAsync();
+            }
+            catch (Exception ex) when (ex is GitException or InvalidOperationException)
+            {
+                failed.Add($"{m.Path} ({ex.Message.Split('\n')[0]})");
+            }
+        }
+
+        return failed.Count == 0 ? "Everything was put back as it was before." : "Could not restore: " + string.Join(", ", failed) + ".";
+    }
+
+    /// <summary>Why <see cref="UndoEverywhereAsync"/> would fail: a repository changed branch or received new commits since the sync.</summary>
+    public async Task<IReadOnlyList<SyncProblem>> CheckUndoEverywhereAsync()
+    {
+        var problems = new List<SyncProblem>();
+        foreach (var (m, st) in await GetSyncStatesAsync())
+        {
+            if (await m.Repo.GetCurrentBranchAsync() != st.Branch)
+            {
+                problems.Add(new SyncProblem(m.Path, $"is no longer on '{st.Branch}'"));
+            }
+            else if (await m.Repo.GetOperationAsync() == GitOperation.None && st.PostHead is not null && await m.Repo.HeadShaAsync() != st.PostHead)
+            {
+                problems.Add(new SyncProblem(m.Path, "has new commits since the sync; undoing would discard them"));
+            }
+        }
+
+        return problems;
+    }
+
+    /// <summary>Puts every repository back to how it was before <see cref="PullEverywhereAsync"/>: branches at their old commits, work in progress restored.</summary>
+    public async Task UndoEverywhereAsync()
+    {
+        if (await CheckUndoEverywhereAsync() is { Count: > 0 } problems)
+        {
+            throw new SyncPreflightException(problems);
+        }
+
+        foreach (var (m, _) in (await GetSyncStatesAsync()).Reverse())
+        {
+            await m.Repo.UndoSmartPullAsync();
+        }
+    }
+
+    /// <summary>Forgets the undo points of all repositories (keeps the result).</summary>
+    public async Task KeepEverywhereAsync()
+    {
+        var states = await GetSyncStatesAsync();
+        if (states.FirstOrDefault(s => s.State.IsPending) is { Member: { } pending })
+        {
+            throw new InvalidOperationException($"{pending.Path}: your changes are still parked; restore them (or undo the sync) first.");
+        }
+
+        foreach (var (m, _) in states)
+        {
+            await m.Repo.DiscardSmartPullAsync();
+        }
     }
 }

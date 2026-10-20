@@ -28,6 +28,7 @@ public partial class MainViewModel : ObservableObject
     private IReadOnlyList<GitRef> _refs = [];
     private IReadOnlyList<StashEntry> _stashes = [];
     private IReadOnlyList<SubmoduleInfo> _submodules = [];
+    private int _subSyncCount; // submodules holding an undo point of a coordinated pull
     private IReadOnlyDictionary<string, SubmoduleLiveStatus> _subLive = new Dictionary<string, SubmoduleLiveStatus>();
     private readonly Stack<string> _parents = new(); // superprojects we descended from; lets "Back" return
     private string? _fileFilter; // when set, history lists only commits touching this file
@@ -99,10 +100,14 @@ public partial class MainViewModel : ObservableObject
         _ => "Merge",
     };
 
-    public bool HasSmartPull => SmartPull is not null;
+    public bool HasSmartPull => SmartPull is not null || _subSyncCount > 0;
     public bool CanRestoreWip => SmartPull is { IsPending: true } && !HasOperation;
-    public bool CanKeepSync => SmartPull is { IsPending: false };
-    public string SmartPullText => SmartPull switch
+    public bool CanKeepSync => HasSmartPull && SmartPull is not { IsPending: true };
+    public string SmartPullText => _subSyncCount > 0 && SmartPull is not { IsPending: true }
+        ? ConflictCount > 0
+            ? $"↺  Synced {_subSyncCount + (SmartPull is null ? 0 : 1)} repositories, but re-applying your changes left conflicts. Resolve them, or undo the sync in all of them."
+            : $"↺  Synced {_subSyncCount + (SmartPull is null ? 0 : 1)} repositories with their upstream. Undo returns all of them to how they were."
+        : SmartPull switch
     {
         null => "",
         { IsPending: true } => HasOperation
@@ -406,6 +411,7 @@ public partial class MainViewModel : ObservableObject
 
             Operation = op;
             SmartPull = await repo.GetSmartPullStateAsync();
+            _subSyncCount = _submodules.Count > 0 ? (await repo.GetSyncStatesAsync()).Count(x => !x.Member.IsRoot) : 0;
             OnPropertyChanged(nameof(HasSmartPull));
             OnPropertyChanged(nameof(CanRestoreWip));
             OnPropertyChanged(nameof(CanKeepSync));
@@ -999,17 +1005,21 @@ public partial class MainViewModel : ObservableObject
     private async Task UndoSyncAsync()
     {
         if (_repo is { } repo
-            && await ConfirmAsync("Undo sync", "Go back to before the pull? The branch returns to its previous commit and your uncommitted changes are restored as they were. Anything changed since the sync is lost."))
+            && await ConfirmAsync("Undo sync", "Go back to before the pull? Every synced repository (submodules included) returns to its previous commit and your uncommitted changes are restored as they were. Anything changed since the sync is lost."))
         {
-            await Mutate(() => repo.UndoSmartPullAsync(), true);
-            if (!IsError)
+            await SyncOpAsync(async r =>
             {
-                StatusText = "Sync undone: branch and uncommitted changes are back to how they were.";
-            }
+                await r.UndoEverywhereAsync();
+                return "Sync undone: branches and uncommitted changes are back to how they were.";
+            });
         }
     }
 
-    [RelayCommand] private Task KeepSyncAsync() => Mutate(() => _repo!.DiscardSmartPullAsync(), true);
+    [RelayCommand] private Task KeepSyncAsync() => SyncOpAsync(async r =>
+    {
+        await r.KeepEverywhereAsync();
+        return "Undo point forgotten.";
+    });
 
     public async Task MergeWithAsync(GitRef r, MergeMode mode)
     {
@@ -1201,13 +1211,24 @@ public partial class MainViewModel : ObservableObject
         });
     }
 
-    /// <summary>Pulls the submodules and then this repository, after checking all of them (clean trees, upstream, predicted conflicts).</summary>
-    public Task PullEverywhereAsync()
-        => SyncOpAsync(async r =>
+    /// <summary>Pulls the submodules and then this repository keeping uncommitted work, after checking all of them (upstream, predicted conflicts); one Undo covers all.</summary>
+    public async Task PullEverywhereAsync()
+    {
+        var conflicts = false;
+        await SyncOpAsync(async r =>
         {
-            var done = await r.PullEverywhereAsync(_settings.PullRebase);
-            return done.Count == 0 ? "Everything is already up to date." : $"Pulled: {string.Join(", ", done)}.";
+            var steps = await r.PullEverywhereAsync(_settings.PullRebase);
+            conflicts = steps.Any(x => x.Outcome == SmartPullOutcome.WipConflicts);
+            return steps.Count == 0
+                ? "Everything is already up to date."
+                : $"Pulled: {string.Join(", ", steps.Select(x => $"{x.Path} ({x.Commits})"))}. Undo sync goes back.";
         });
+        if (conflicts && !IsError)
+        {
+            SelectedTab = 1;
+            Fail("Pulled, but your changes conflict with the incoming ones in some repository: resolve the marked files, or Undo sync.");
+        }
+    }
 
     /// <summary>Pushes the submodules and then this repository, after checking all of them (fetch, behind, dry-run).</summary>
     public Task PushEverywhereAsync()
