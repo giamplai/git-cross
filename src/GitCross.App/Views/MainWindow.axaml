@@ -106,6 +106,10 @@
                     <DockPanel.ContextMenu>
                       <ContextMenu>
                         <MenuItem Header="Initialize / update all submodules" Click="OnSubmoduleUpdateAll" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Create branch on repository and all submodules…" Click="OnSubmoduleBranchAll" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Check out this branch in all submodules" Click="OnSubmoduleAlign" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Commit all (submodules first)…" Click="OnSubmoduleCommitAll" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Push all (submodules first)" Click="OnSubmodulePushAll" IsVisible="{Binding IsSubmoduleHeader}" />
                       </ContextMenu>
                     </DockPanel.ContextMenu>
                     <TextBlock DockPanel.Dock="Right" Text="{Binding Count}" Classes="section" />

@@ -169,6 +169,12 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Supplied by the view to ask before destructive actions (title, message → confirmed). Unset = proceed.</summary>
     public Func<string, string, Task<bool>>? Confirm { get; set; }
 
+    /// <summary>Supplied by the view: asks for one line of text (title, message, ok text, placeholder → text). Null = cancelled/unset.</summary>
+    public Func<string, string, string, string, Task<string?>>? Ask { get; set; }
+
+    /// <summary>Supplied by the view: shows a message the user must read (title, message).</summary>
+    public Func<string, string, Task>? Inform { get; set; }
+
     private async Task<bool> ConfirmAsync(string title, string message)
         => Confirm is null || await Confirm(title, message);
 
@@ -1114,6 +1120,92 @@ public partial class MainViewModel : ObservableObject
         NotifyParent();
         await OpenCoreAsync(target, remember: false);
     }
+
+    /// <summary>Runs a coordinated submodule operation. Pre-flight problems are shown in a dialog because nothing was changed.</summary>
+    private async Task SyncOpAsync(Func<GitRepository, Task<string>> op)
+    {
+        if (_repo is not { } repo)
+        {
+            return;
+        }
+
+        string? summary = null;
+        string? stopped = null;
+        string? title = null;
+        try
+        {
+            await Guard(async () => summary = await op(repo));
+        }
+        catch (SyncPreflightException ex)
+        {
+            (title, stopped) = ("Nothing was changed", ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            (title, stopped) = ("Operation stopped", ex.Message);
+        }
+
+        await RefreshAsync();
+        if (stopped is not null)
+        {
+            Fail(stopped.Split('\n')[0]);
+            if (Inform is not null)
+            {
+                await Inform(title!, stopped);
+            }
+        }
+        else if (summary is not null && !IsError)
+        {
+            StatusText = summary;
+        }
+    }
+
+    /// <summary>Creates the same branch on this repository and all its submodules and checks it out everywhere.</summary>
+    public async Task CreateBranchEverywhereAsync()
+    {
+        if (Ask is null || await Ask("New branch everywhere", "Creates the branch in this repository and in every submodule (at their current commits) and checks it out in all of them. Nothing is changed unless every repository can do it.", "Create", "branch name, e.g. feature/login") is not { Length: > 0 } name)
+        {
+            return;
+        }
+
+        await SyncOpAsync(async r =>
+        {
+            await r.CreateBranchEverywhereAsync(name);
+            return $"Branch '{name}' created and checked out in the repository and all submodules.";
+        });
+    }
+
+    /// <summary>Checks out the branch of this repository in every submodule (instead of the detached recorded commit).</summary>
+    public Task AlignSubmodulesAsync()
+        => SyncOpAsync(async r =>
+        {
+            var branch = await r.GetCurrentBranchAsync() ?? throw new InvalidOperationException("This repository is on a detached HEAD: check out a branch first.");
+            await r.AlignSubmodulesToBranchAsync(branch);
+            return $"Submodules are now on branch '{branch}'.";
+        });
+
+    /// <summary>Commits all changes with one message, submodules first so this repository records their new commits.</summary>
+    public async Task CommitEverywhereAsync()
+    {
+        if (Ask is null || await Ask("Commit everywhere", "Stages and commits ALL changes with the same message in every submodule that has changes and then in this repository (which records the new submodule commits).", "Commit all", "commit message") is not { Length: > 0 } message)
+        {
+            return;
+        }
+
+        await SyncOpAsync(async r =>
+        {
+            var done = await r.CommitEverywhereAsync(message);
+            return done.Count == 0 ? "Nothing to commit." : $"Committed in: {string.Join(", ", done)}.";
+        });
+    }
+
+    /// <summary>Pushes the submodules and then this repository, after checking all of them (fetch, behind, dry-run).</summary>
+    public Task PushEverywhereAsync()
+        => SyncOpAsync(async r =>
+        {
+            var done = await r.PushEverywhereAsync();
+            return done.Count == 0 ? "Everything is already pushed." : $"Pushed: {string.Join(", ", done)}.";
+        });
 
     public Task UpdateSubmoduleAsync(SubmoduleInfo sub) => Mutate(() => _repo!.SubmoduleUpdateAsync(sub.Path), sub);
 

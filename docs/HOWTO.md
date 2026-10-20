@@ -368,6 +368,19 @@ What you can do:
 * Right-click the **SUBMODULES** header → **Initialize / update all submodules**.
 * When **cloning**, keep **Also clone submodules (recursive)** ticked in the clone dialog to get everything in one step.
 
+### Working on parent and submodules together
+
+Right-click the **SUBMODULES** header for operations that act on the repository and all its (nested) submodules at once. Each one first checks every repository and, if any would fail, **changes nothing** and lists the problems in a dialog, so you never end up half way.
+
+| Command | What it does | Refused when |
+|---|---|---|
+| **Create branch on repository and all submodules…** | Creates the branch at the current commit of each repository and checks it out everywhere. | the name is invalid or exists in any repository, a submodule is not initialized, a merge/rebase is in progress. |
+| **Check out this branch in all submodules** | Puts every submodule on the branch the top repository is on, instead of the detached recorded commit. Uses the local branch, or creates a tracking branch from the remote one; if the branch is just behind the recorded commit it is fast-forwarded, so the recorded commit is kept. | a submodule has no such branch (local or remote), a submodule is not initialized. |
+| **Commit all (submodules first)…** | Stages everything and commits with the same message in each repository that has changes, deepest submodule first, so the parent records the new submodule commits in the same step. If a commit fails the ones already made are undone (changes stay staged). | empty message, unresolved conflicts, a repository with changes is on a detached HEAD, git user name/email missing. |
+| **Push all (submodules first)** | Fetches every repository, then pushes the ones that are ahead (or have no upstream, which is set to `origin`), submodules before the parent so the parent never points at unpublished commits. | a repository is behind its upstream (pull first), the remote is unreachable, or a dry-run push shows the remote would reject it. |
+
+Tips: after a plain clone submodules are detached, so run **Check out this branch in all submodules** (or create the branch everywhere) before editing and committing. If a push fails after some repositories were already pushed, the message lists exactly what went out; fix the cause and push again.
+
 Trying to open an uninitialized submodule tells you to initialize it first. Adding a new submodule and changing its URL are still done from the command line (`git submodule add <url> <path>`); the app picks them up on the next refresh.
 
 ## 13. Cherry-pick, revert, reset
