@@ -7,7 +7,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <!-- Never leak the build machine's folder names into distributed binaries -->
     <PathMap>$(MSBuildThisFileDirectory)=/_/</PathMap>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
