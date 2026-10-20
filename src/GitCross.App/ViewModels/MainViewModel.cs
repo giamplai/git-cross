@@ -68,6 +68,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _graphWidth = 40;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasOperation)), NotifyPropertyChangedFor(nameof(OperationText))] private GitOperation _operation;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(OperationText)), NotifyPropertyChangedFor(nameof(CanContinue))] private int _conflictCount;
+    [ObservableProperty] private SmartPullState? _smartPull;
     [ObservableProperty] private string _blameTitle = "";
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasFileFilter)), NotifyPropertyChangedFor(nameof(FileFilterText))] private string? _fileFilterPath;
     [ObservableProperty] private ThemeVariant _themeVariant = ThemeVariant.Default;
@@ -95,6 +96,21 @@ public partial class MainViewModel : ObservableObject
         GitOperation.Revert => "Revert",
         GitOperation.Rebase => "Rebase",
         _ => "Merge",
+    };
+
+    public bool HasSmartPull => SmartPull is not null;
+    public bool CanRestoreWip => SmartPull is { IsPending: true } && !HasOperation;
+    public bool CanKeepSync => SmartPull is { IsPending: false };
+    public string SmartPullText => SmartPull switch
+    {
+        null => "",
+        { IsPending: true } => HasOperation
+            ? "↺  Your uncommitted changes are parked safely while the pull is finished."
+            : "↺  Pull finished. Your uncommitted changes are parked: restore them now.",
+        { WipRestored: true } when ConflictCount > 0
+            => $"↺  Synced, but re-applying your changes left {ConflictCount} conflicted file{(ConflictCount == 1 ? "" : "s")}. Resolve them, or undo the sync.",
+        { WipRestored: true } => "↺  Synced with the upstream and your changes are back. Undo returns to how things were before.",
+        _ => "↺  Synced with the upstream. Undo returns to how things were before.",
     };
 
     public bool HasFileFilter => FileFilterPath is not null;
@@ -381,6 +397,11 @@ public partial class MainViewModel : ObservableObject
             }
 
             Operation = op;
+            SmartPull = await repo.GetSmartPullStateAsync();
+            OnPropertyChanged(nameof(HasSmartPull));
+            OnPropertyChanged(nameof(CanRestoreWip));
+            OnPropertyChanged(nameof(CanKeepSync));
+            OnPropertyChanged(nameof(SmartPullText));
 
             BranchText = status.Branch ?? "detached HEAD";
             SyncText = status.Ahead + status.Behind > 0 ? $"↑{status.Ahead}  ↓{status.Behind}" : "";
@@ -906,7 +927,81 @@ public partial class MainViewModel : ObservableObject
 
     [RelayCommand] private Task FetchAsync() => Mutate(() => _repo!.FetchAsync(), true);
 
-    [RelayCommand] private Task PullRebaseAsync() => Mutate(() => _repo!.PullAsync(rebase: true), true);
+    [RelayCommand] private Task PullRebaseAsync() => SyncAsync(rebase: true);
+
+    /// <summary>Pull; with uncommitted work it parks it, pulls, re-applies it and keeps an undo point (see GitRepository.SmartPullAsync).</summary>
+    private async Task SyncAsync(bool rebase)
+    {
+        if (_repo is not { } repo)
+        {
+            return;
+        }
+
+        if (Unstaged.Count + Staged.Count == 0)
+        {
+            await Mutate(() => repo.PullAsync(rebase), true);
+            return;
+        }
+
+        SmartPullOutcome? outcome = null;
+        await Mutate(async () =>
+        {
+            if (await repo.GetSmartPullStateAsync() is { IsPending: false })
+            {
+                await repo.DiscardSmartPullAsync(); // a new sync supersedes the previous undo point
+            }
+
+            outcome = await repo.SmartPullAsync(rebase);
+        }, true);
+        ReportSync(outcome);
+    }
+
+    private void ReportSync(SmartPullOutcome? outcome)
+    {
+        switch (outcome)
+        {
+            case SmartPullOutcome.Clean:
+                IsError = false;
+                StatusText = "Pulled, and your changes are back in place. Use Undo sync to go back.";
+                break;
+            case SmartPullOutcome.WipConflicts:
+                SelectedTab = 1;
+                Fail("Pulled, but your changes conflict with the incoming ones: resolve the marked files, or Undo sync.");
+                break;
+            case SmartPullOutcome.PullConflicts:
+                Fail("The pull stopped on conflicts. Your changes are parked: resolve, Continue, then Restore my changes (or Undo sync).");
+                break;
+        }
+    }
+
+    [RelayCommand]
+    private async Task RestoreWipAsync()
+    {
+        if (_repo is not { } repo)
+        {
+            return;
+        }
+
+        SmartPullOutcome? outcome = null;
+        await Mutate(async () => outcome = await repo.RestoreWipAsync(), true);
+        ReportSync(outcome);
+    }
+
+    [RelayCommand]
+    private async Task UndoSyncAsync()
+    {
+        if (_repo is { } repo
+            && await ConfirmAsync("Undo sync", "Go back to before the pull? The branch returns to its previous commit and your uncommitted changes are restored as they were. Anything changed since the sync is lost."))
+        {
+            await Mutate(() => repo.UndoSmartPullAsync(), true);
+            if (!IsError)
+            {
+                StatusText = "Sync undone: branch and uncommitted changes are back to how they were.";
+            }
+        }
+    }
+
+    [RelayCommand] private Task KeepSyncAsync() => Mutate(() => _repo!.DiscardSmartPullAsync(), true);
 
     public async Task MergeWithAsync(GitRef r, MergeMode mode)
     {
@@ -944,9 +1039,9 @@ public partial class MainViewModel : ObservableObject
 
     public string CurrentBranch => BranchText;
 
-    [RelayCommand] private Task PullAsync() => Mutate(() => _repo!.PullAsync(rebase: _settings.PullRebase), true);
+    [RelayCommand] private Task PullAsync() => SyncAsync(_settings.PullRebase);
 
-    [RelayCommand] private Task PullMergeAsync() => Mutate(() => _repo!.PullAsync(rebase: false), true);
+    [RelayCommand] private Task PullMergeAsync() => SyncAsync(rebase: false);
 
     [RelayCommand] private Task PushAsync() => Mutate(() => _repo!.PushAsync(), true);
 

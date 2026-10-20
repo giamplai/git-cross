@@ -8,7 +8,7 @@ using GitCross.Core.Tools;
 namespace GitCross.Core.Git;
 
 /// <summary>High level operations on one repository. Every method maps to plain git CLI calls.</summary>
-public sealed class GitRepository
+public sealed partial class GitRepository
 {
     private readonly GitRunner _git;
 
@@ -226,7 +226,7 @@ public sealed class GitRepository
 
     public Task FetchAsync() => _git.OutAsync("fetch", "--all", "--prune");
 
-    public Task PullAsync(bool rebase = false) => _git.OutAsync(rebase ? ["pull", "--rebase"] : ["pull"]);
+    public Task PullAsync(bool rebase = false) => _git.OutAsync(rebase ? ["pull", "--rebase"] : ["pull", "--no-rebase"]);
 
     public Task PushAsync(bool setUpstream = false)
         => _git.OutAsync(setUpstream ? ["push", "-u", "origin", "HEAD"] : ["push"]);
