@@ -126,7 +126,7 @@ Drag the thin separators between areas to resize them. The window refreshes itse
 | **Branch pill** | Shows the current branch (or "detached HEAD") and, when the branch tracks a remote, `↑ahead ↓behind` commit counts. |
 | **Refresh** (**F5**) | Reload history, refs and working tree. |
 | **Fetch** | `git fetch --all --prune`. |
-| **Pull** | `git pull` using your default mode (merge, or rebase if you enabled it in Settings). Click the **▾** arrow next to it for **Pull (merge)** or **Pull (rebase)** to choose explicitly; rebase replays your local commits on top of the fetched ones instead of creating a merge commit. |
+| **Pull** | `git pull` using your default mode (merge, or rebase if you enabled it in Settings). Click the **▾** arrow next to it for **Pull (merge)** or **Pull (rebase)** to choose explicitly (with uncommitted changes, see [pulling with work in progress](#pull-with-work-in-progress)); rebase replays your local commits on top of the fetched ones instead of creating a merge commit. |
 | **Push** | `git push`. |
 | **Stash** | Stash all changes including untracked files. Does nothing when the working tree is clean. |
 | **Pop** | Apply and remove the newest stash. |
@@ -327,6 +327,16 @@ Good to know:
 * **Push** uploads the current branch.
 
 The branch pill's `↑N ↓M` shows how many commits you are ahead/behind the upstream. Operations never prompt for passwords in the terminal; configure SSH keys or a git credential helper. If a pull conflicts, the conflict banner appears (section 15). Errors from git (rejected push, no upstream, authentication) are shown in the status bar.
+
+### Pull with work in progress
+
+If you have uncommitted changes (staged, unstaged or untracked), **Pull** does not refuse or mix things up: it parks your changes, pulls (merge or rebase, as chosen), and puts them back, keeping the staged/unstaged split. A blue banner then offers:
+
+* **Undo sync**: returns the branch to its previous commit and your changes to exactly how they were (asks for confirmation; changes made after the sync are lost). Not available once you have made new commits on the branch.
+* **Keep**: forget the undo point. Starting another pull also replaces it.
+* **Restore my changes**: shown when the pull itself stopped on conflicts. Your changes stay parked safely (even if you close the app); resolve the conflicts, **Continue**, then restore them. If restoring conflicts with the incoming changes, resolve the marked files as usual, or undo the sync.
+
+If the pull fails without changing anything (offline, no upstream), your changes are put straight back and the error is shown.
 
 ## 12. Stashes
 
