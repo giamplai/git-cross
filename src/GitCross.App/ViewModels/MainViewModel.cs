@@ -28,6 +28,7 @@ public partial class MainViewModel : ObservableObject
     private IReadOnlyList<GitRef> _refs = [];
     private IReadOnlyList<StashEntry> _stashes = [];
     private IReadOnlyList<SubmoduleInfo> _submodules = [];
+    private IReadOnlyDictionary<string, TagInfo> _tagInfo = new Dictionary<string, TagInfo>();
     private int _subSyncCount; // submodules holding an undo point of a coordinated pull
     private IReadOnlyDictionary<string, SubmoduleLiveStatus> _subLive = new Dictionary<string, SubmoduleLiveStatus>();
     private readonly Stack<string> _parents = new(); // superprojects we descended from; lets "Back" return
@@ -392,7 +393,9 @@ public partial class MainViewModel : ObservableObject
             var statusTask = repo.GetStatusAsync();
             var stashTask = repo.GetStashesAsync();
             var subTask = repo.GetSubmodulesAsync();
-            await Task.WhenAll(commitsTask, refsTask, statusTask, stashTask, subTask);
+            var tagTask = repo.GetTagInfoAsync();
+            await Task.WhenAll(commitsTask, refsTask, statusTask, stashTask, subTask, tagTask);
+            _tagInfo = tagTask.Result;
             _submodules = subTask.Result;
             _subLive = _submodules.Count > 0 ? await repo.GetSubmoduleLiveStatusesAsync() : _subLive;
             var (commits, refs, status) = (commitsTask.Result, refsTask.Result, statusTask.Result);
@@ -476,6 +479,9 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    private string? TagNote(string name)
+        => _tagInfo.TryGetValue(name, out var t) ? (t.Annotated ? "Annotated tag" + (t.Message.Length > 0 ? ": " + t.Message : "") : "Lightweight tag") : null;
+
     private void BuildSidebar(IReadOnlyList<GitRef> refs)
     {
         Sidebar.Clear();
@@ -490,7 +496,7 @@ public partial class MainViewModel : ObservableObject
             Sidebar.Add(new SidebarEntry(title, IsHeader: true, Count: items.Count.ToString()));
             foreach (var r in items)
             {
-                Sidebar.Add(new SidebarEntry(r.Name, r));
+                Sidebar.Add(new SidebarEntry(r.Name, r, Note: kind == RefKind.Tag ? TagNote(r.Name) : null));
             }
         }
 
@@ -1255,7 +1261,56 @@ public partial class MainViewModel : ObservableObject
 
     public Task ResetToAsync(string sha, ResetMode mode) => Mutate(() => _repo!.ResetAsync(sha, mode), sha);
 
-    public Task TagAsync(string sha, string name) => Mutate(() => _repo!.CreateTagAsync(name, sha), sha);
+    public Task<string?> ValidateTagAsync(TagOptions o) => _repo is { } r ? r.ValidateTagAsync(o) : Task.FromResult<string?>(null);
+
+    public async Task<IReadOnlyList<string>> GetRemoteNamesAsync() => _repo is { } r ? await r.GetRemotesAsync() : [];
+
+    /// <summary>Creates a tag (lightweight, annotated or signed) and optionally pushes it to <paramref name="pushRemote"/>.</summary>
+    public Task CreateTagAsync(TagOptions o, string? pushRemote)
+        => Mutate(async () =>
+        {
+            await _repo!.CreateTagAsync(o);
+            if (pushRemote is not null)
+            {
+                await _repo.PushTagAsync(o.Name, pushRemote, o.Force);
+            }
+        }, o);
+
+    public async Task DeleteTagAsync(GitRef tag)
+    {
+        if (await ConfirmAsync("Delete tag", $"Delete the local tag '{tag.Name}'? Commits are not affected; a tag already pushed stays on the remote."))
+        {
+            await Mutate(() => _repo!.DeleteTagAsync(tag.Name), tag);
+        }
+    }
+
+    public async Task PushTagAsync(GitRef tag)
+    {
+        var remotes = await GetRemoteNamesAsync();
+        var remote = remotes.Contains("origin") ? "origin" : remotes.FirstOrDefault();
+        if (remote is null)
+        {
+            Fail("This repository has no remote to push the tag to.");
+            return;
+        }
+
+        await Mutate(async () =>
+        {
+            await _repo!.PushTagAsync(tag.Name, remote);
+            StatusText = $"Tag '{tag.Name}' pushed to {remote}.";
+        }, tag);
+    }
+
+    public async Task DeleteRemoteTagAsync(GitRef tag)
+    {
+        var remotes = await GetRemoteNamesAsync();
+        var remote = remotes.Contains("origin") ? "origin" : remotes.FirstOrDefault();
+        if (remote is not null
+            && await ConfirmAsync("Delete remote tag", $"Delete the tag '{tag.Name}' on '{remote}'? Everyone who fetched it keeps their copy, but it disappears for new clones."))
+        {
+            await Mutate(() => _repo!.DeleteRemoteTagAsync(tag.Name, remote), tag);
+        }
+    }
 
     public Task CheckoutShaAsync(string sha) => Mutate(() => _repo!.CheckoutAsync(sha), sha);
 

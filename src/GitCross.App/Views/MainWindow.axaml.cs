@@ -172,16 +172,36 @@ public partial class MainWindow : Window
 
     private async void OnCommitTag(object? s, RoutedEventArgs e)
     {
-        if (ItemOf(s) is not { } i)
+        if (ItemOf(s) is { } i)
         {
-            return;
+            await ShowTagDialogAsync(i.Commit!.Sha);
         }
+    }
 
-        var name = await PromptWindow.AskAsync(this, "Create tag", $"Tag commit {i.ShortSha}", "Create tag", true, "tag name, e.g. v1.2.0");
-        if (name is { Length: > 0 })
+    private async void OnTagCreateHead(object? s, RoutedEventArgs e) => await ShowTagDialogAsync("HEAD");
+
+    private async Task ShowTagDialogAsync(string target)
+    {
+        var dialog = new TagWindow(target, await _vm.GetRemoteNamesAsync(), _vm.ValidateTagAsync);
+        if (await dialog.ShowDialog<TagDialogResult?>(this) is { } r)
         {
-            await _vm.TagAsync(i.Commit!.Sha, name);
+            await _vm.CreateTagAsync(r.Options, r.PushRemote);
         }
+    }
+
+    private async void OnTagPush(object? s, RoutedEventArgs e)
+    {
+        if (RefOf(s) is { } r) { await _vm.PushTagAsync(r); }
+    }
+
+    private async void OnTagDelete(object? s, RoutedEventArgs e)
+    {
+        if (RefOf(s) is { } r) { await _vm.DeleteTagAsync(r); }
+    }
+
+    private async void OnTagDeleteRemote(object? s, RoutedEventArgs e)
+    {
+        if (RefOf(s) is { } r) { await _vm.DeleteRemoteTagAsync(r); }
     }
 
     private async void OnCommitCopy(object? s, RoutedEventArgs e)
