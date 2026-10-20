@@ -19,6 +19,16 @@ public sealed class TempRepo : IDisposable
         return (t, repo);
     }
 
+    /// <summary>A clone of <paramref name="source"/> (its "origin") with a test identity configured.</summary>
+    public static async Task<(TempRepo Temp, GitRepository Repo)> CloneAsync(string source)
+    {
+        var t = new TempRepo();
+        var repo = await GitRepository.CloneAsync(source, t.Path);
+        t.Git("config", "user.name", "Test");
+        t.Git("config", "user.email", "t@example.com");
+        return (t, repo);
+    }
+
     public void Write(string rel, string content)
     {
         var full = System.IO.Path.Combine(Path, rel);

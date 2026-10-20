@@ -1,3 +1,4 @@
+using GitCross.Core.Git;
 using GitCross.Core.Graph;
 using GitCross.Core.Models;
 using GitCross.Core.Submodules;
@@ -22,11 +23,18 @@ public sealed class HistoryItem
     public double GraphWidth { get; init; }
 }
 
-public sealed record SidebarEntry(string Text, GitRef? Ref = null, bool IsHeader = false, string Count = "", StashEntry? Stash = null, SubmoduleInfo? Submodule = null)
+public sealed record SidebarEntry(string Text, GitRef? Ref = null, bool IsHeader = false, string Count = "", StashEntry? Stash = null, SubmoduleInfo? Submodule = null, SubmoduleLiveStatus? Live = null, string? Note = null)
 {
     public bool IsSubmodule => Submodule is not null;
     public bool IsSubmoduleHeader => IsHeader && Text == "SUBMODULES";
-    public string? Tip => Submodule is { } m ? $"{m.Path}\n{m.Url}\n{m.State}{(m.Describe is null ? "" : "  ·  " + m.Describe)}" : null;
+    public bool IsTag => Ref is { Kind: RefKind.Tag };
+    public bool IsTagHeader => IsHeader && Text == "TAGS";
+    public string? Tip => Note ?? (Submodule is { } m ? $"{m.Path}\n{m.Url}\n{m.State}{(m.Describe is null ? "" : "  ·  " + m.Describe)}{(Live is null ? "" : "\nbranch: " + (Live.Branch ?? "detached HEAD") + (Live.Dirty ? "\nuncommitted changes" : ""))}" : null);
+    /// <summary>Short live state shown after a submodule name: branch (or "detached"), ahead/behind, uncommitted changes.</summary>
+    public string Detail => Live is null
+        ? ""
+        : $"{Live.Branch ?? "detached"}{(Live.Ahead > 0 ? $" ↑{Live.Ahead}" : "")}{(Live.Behind > 0 ? $" ↓{Live.Behind}" : "")}{(Live.Dirty ? " ●" : "")}";
+
     public bool IsItem => !IsHeader;
     public bool IsRefItem => Ref is not null;
     public bool IsStash => Stash is not null;

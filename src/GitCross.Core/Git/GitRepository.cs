@@ -8,7 +8,7 @@ using GitCross.Core.Tools;
 namespace GitCross.Core.Git;
 
 /// <summary>High level operations on one repository. Every method maps to plain git CLI calls.</summary>
-public sealed class GitRepository
+public sealed partial class GitRepository
 {
     private readonly GitRunner _git;
 
@@ -176,6 +176,80 @@ public sealed class GitRepository
 
     public Task CreateTagAsync(string name, string? sha = null) => _git.OutAsync(sha is null ? ["tag", name] : ["tag", name, sha]);
 
+    /// <summary>
+    /// Creates a tag with options. A <see cref="TagOptions.Message"/> makes it annotated (carries author, date and message);
+    /// <see cref="TagOptions.Sign"/> signs it (needs GPG/SSH signing configured in git, and a message).
+    /// </summary>
+    public Task CreateTagAsync(TagOptions o)
+    {
+        List<string> a = ["tag"];
+        if (o.Sign) { a.Add("-s"); }
+        else if (!string.IsNullOrWhiteSpace(o.Message)) { a.Add("-a"); }
+        if (o.Sign || !string.IsNullOrWhiteSpace(o.Message)) { a.AddRange(["-m", o.Message ?? ""]); }
+        if (o.Force) { a.Add("-f"); }
+        a.Add(o.Name);
+        if (!string.IsNullOrWhiteSpace(o.Target)) { a.Add(o.Target); }
+        return _git.OutAsync([.. a]);
+    }
+
+    /// <summary>Why <paramref name="o"/> cannot be created (null when it can), checked without changing anything.</summary>
+    public async Task<string?> ValidateTagAsync(TagOptions o)
+    {
+        if (string.IsNullOrWhiteSpace(o.Name))
+        {
+            return "Enter a tag name.";
+        }
+
+        if (!(await _git.RunAsync(["check-ref-format", "refs/tags/" + o.Name], null, default)).Success)
+        {
+            return $"'{o.Name}' is not a valid tag name.";
+        }
+
+        if (!o.Force && await RefExistsAsync("refs/tags/" + o.Name))
+        {
+            return $"Tag '{o.Name}' already exists (tick Force to move it).";
+        }
+
+        if (o.Sign && string.IsNullOrWhiteSpace(o.Message))
+        {
+            return "A signed tag needs a message.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(o.Target) && !(await _git.RunAsync(["rev-parse", "--verify", "-q", o.Target + "^{commit}"], null, default)).Success)
+        {
+            return $"'{o.Target}' is not a commit or reference.";
+        }
+
+        return null;
+    }
+
+    public Task DeleteTagAsync(string name) => _git.OutAsync("tag", "-d", name);
+
+    public Task PushTagAsync(string name, string remote = "origin", bool force = false)
+        => _git.OutAsync(force ? ["push", "--force", remote, "refs/tags/" + name] : ["push", remote, "refs/tags/" + name]);
+
+    public Task DeleteRemoteTagAsync(string name, string remote = "origin") => _git.OutAsync("push", remote, "--delete", "refs/tags/" + name);
+
+    public async Task<IReadOnlyList<string>> GetRemotesAsync()
+        => (await _git.OutAsync("remote")).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    /// <summary>Annotated flag and first message line of each tag, by name (lightweight tags have no message).</summary>
+    public async Task<IReadOnlyDictionary<string, TagInfo>> GetTagInfoAsync()
+    {
+        var r = await _git.RunAsync(["for-each-ref", "--format=%(refname:short)%1f%(objecttype)%1f%(contents:subject)", "refs/tags"], null, default);
+        var map = new Dictionary<string, TagInfo>();
+        foreach (var line in r.Success ? r.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries) : [])
+        {
+            var f = line.Split('\u001f');
+            if (f.Length >= 3)
+            {
+                map[f[0]] = f[1] == "tag" ? new TagInfo(true, f[2].Trim()) : new TagInfo(false, ""); // a lightweight tag "shows" its commit message
+            }
+        }
+
+        return map;
+    }
+
     public Task MergeAsync(string branch, MergeMode mode = MergeMode.Default)
         => _git.OutAsync(mode switch
         {
@@ -226,7 +300,7 @@ public sealed class GitRepository
 
     public Task FetchAsync() => _git.OutAsync("fetch", "--all", "--prune");
 
-    public Task PullAsync(bool rebase = false) => _git.OutAsync(rebase ? ["pull", "--rebase"] : ["pull"]);
+    public Task PullAsync(bool rebase = false) => _git.OutAsync(rebase ? ["pull", "--rebase"] : ["pull", "--no-rebase"]);
 
     public Task PushAsync(bool setUpstream = false)
         => _git.OutAsync(setUpstream ? ["push", "-u", "origin", "HEAD"] : ["push"]);
@@ -458,6 +532,10 @@ public sealed class GitRepository
         => _git.OutAsync("reset", mode switch { ResetMode.Soft => "--soft", ResetMode.Hard => "--hard", _ => "--mixed" }, sha);
 
 }
+
+public sealed record TagOptions(string Name, string? Target = null, string? Message = null, bool Sign = false, bool Force = false);
+
+public sealed record TagInfo(bool Annotated, string Message);
 
 public sealed record ToolMergeOutcome(bool Success, string? Message);
 

@@ -126,7 +126,7 @@ Drag the thin separators between areas to resize them. The window refreshes itse
 | **Branch pill** | Shows the current branch (or "detached HEAD") and, when the branch tracks a remote, `↑ahead ↓behind` commit counts. |
 | **Refresh** (**F5**) | Reload history, refs and working tree. |
 | **Fetch** | `git fetch --all --prune`. |
-| **Pull** | `git pull` using your default mode (merge, or rebase if you enabled it in Settings). Click the **▾** arrow next to it for **Pull (merge)** or **Pull (rebase)** to choose explicitly; rebase replays your local commits on top of the fetched ones instead of creating a merge commit. |
+| **Pull** | `git pull` using your default mode (merge, or rebase if you enabled it in Settings). Click the **▾** arrow next to it for **Pull (merge)** or **Pull (rebase)** to choose explicitly (with uncommitted changes, see [pulling with work in progress](#pull-with-work-in-progress)); rebase replays your local commits on top of the fetched ones instead of creating a merge commit. |
 | **Push** | `git push`. |
 | **Stash** | Stash all changes including untracked files. Does nothing when the working tree is clean. |
 | **Pop** | Apply and remove the newest stash. |
@@ -178,7 +178,7 @@ Right-click any commit:
 | Item | Effect |
 |---|---|
 | **Checkout this commit** | Detached-HEAD checkout of that commit. |
-| **Create tag here…** | Asks for a tag name, then creates a lightweight tag on that commit. |
+| **Create tag here…** | Opens the tag dialog for that commit ([section 10](#10-branches-and-tags)): lightweight, annotated or signed tag. |
 | **Cherry-pick onto current branch** | Applies that commit on top of the current branch (see [section 13](#13-cherry-pick-revert-reset)). |
 | **Revert this commit** | Creates a new commit that undoes it (merge commits are reverted against their first parent). |
 | **Interactive rebase onto this commit…** | Opens the interactive rebase dialog for the commits *after* the one you clicked ([section 10b](#10b-interactive-rebase)). |
@@ -287,8 +287,24 @@ If there is nothing staged or the message is empty, the status bar says so and n
 | Combine a branch into one commit | **Merge (squash into staged changes)** — brings the branch's changes into your index without committing and opens the **Commit** tab; write a message and commit. No merge relationship is recorded. |
 | Put your branch on top of another | **Rebase current branch onto this** — replays the *current* branch's commits after the selected branch, giving a linear history. Asks for confirmation because it rewrites the current branch's commits (avoid on branches you already pushed and others use). Conflicts show the banner of section 15; **Continue** moves to the next commit. |
 | Delete a branch | Right-click → **Delete branch** (safe delete only; the current branch cannot be deleted). |
-| Create a tag | Right-click a commit → **Create tag here…**. |
+| Create a tag | Right-click a commit → **Create tag here…**, or right-click the **TAGS** header → **Create tag on the current commit…**. See below. |
 | Check out a tag | Double-click it (detached HEAD). |
+| Push / delete a tag | Right-click the tag → **Push tag** (to `origin`, or the first remote), **Delete tag** (local only) or **Delete tag on remote** (both ask for confirmation where data is removed). |
+
+### The tag dialog
+
+![Tag dialog](images/tag-dialog.png)
+
+| Field | Meaning |
+|---|---|
+| **Tag name** | Must be a valid git reference name (no spaces, `~`, `^`, `:`…). Checked before anything is created. |
+| **Tag this commit or reference** | Pre-filled with the commit you right-clicked (or `HEAD`); you can type another commit, branch or tag. |
+| **Message** | Leave empty for a **lightweight** tag (just a name). With a message the tag is **annotated**: it records who made it, when, and your text, which is what releases normally use. |
+| **Sign the tag** | Creates a signed tag; needs GPG or SSH signing set up in git, and a message. |
+| **Replace the tag if it already exists** | Moves an existing tag (`-f`). Without it an existing name is refused. Pushing a moved tag that was already published also needs the remote to accept it. |
+| **Push to remote after creating** | Shown when the repository has a remote; pushes just this tag. |
+
+Hovering a tag in the sidebar tells you whether it is annotated and shows the first line of its message.
 
 If a checkout would overwrite uncommitted changes, git refuses and the message appears in red in the status bar; stash or commit first.
 
@@ -328,6 +344,16 @@ Good to know:
 
 The branch pill's `↑N ↓M` shows how many commits you are ahead/behind the upstream. Operations never prompt for passwords in the terminal; configure SSH keys or a git credential helper. If a pull conflicts, the conflict banner appears (section 15). Errors from git (rejected push, no upstream, authentication) are shown in the status bar.
 
+### Pull with work in progress
+
+If you have uncommitted changes (staged, unstaged or untracked), **Pull** does not refuse or mix things up: it parks your changes, pulls (merge or rebase, as chosen), and puts them back, keeping the staged/unstaged split. A blue banner then offers:
+
+* **Undo sync**: returns the branch (and, after **Pull all**, every submodule) to its previous commit and your changes to exactly how they were (asks for confirmation; changes made after the sync are lost). Refused, changing nothing, once a synced repository has new commits.
+* **Keep**: forget the undo point. Starting another pull also replaces it.
+* **Restore my changes**: shown when the pull itself stopped on conflicts. Your changes stay parked safely (even if you close the app); resolve the conflicts, **Continue**, then restore them. If restoring conflicts with the incoming changes, resolve the marked files as usual, or undo the sync.
+
+If the pull fails without changing anything (offline, no upstream), your changes are put straight back and the error is shown.
+
 ## 12. Stashes
 
 Stashing saves your uncommitted work (including untracked files) and restores a clean tree.
@@ -351,12 +377,28 @@ A submodule is another git repository nested inside yours at a fixed commit. Whe
 | ↻ | **Modified** — the submodule is checked out at a different commit than the one recorded (it has new commits, or you moved it). The change shows up as a modified file in the **Commit** tab; stage and commit it to record the new commit. |
 | ⚠ | **Conflicted** — the submodule entry has a merge conflict. |
 
+Next to each initialized submodule the sidebar shows its live state: the branch it is on (or *detached*), `↑N`/`↓M` commits ahead/behind its upstream, and `●` when it has uncommitted changes. Spot a *detached* one before you start editing.
+
 What you can do:
 
 * **Double-click** a submodule (or right-click → **Open submodule repository**) to open it as a repository in its own right: you can browse its history, commit, branch and push there. A **◀ Back to …** button appears at the left of the toolbar to return to the repository you came from. Submodules you open this way are not added to the *Recent* list.
 * Right-click → **Initialize / update this submodule** clones a not-initialized submodule (and its own nested submodules) and checks out the recorded commit. Updating a submodule you have moved discards that move and returns it to the recorded commit.
 * Right-click the **SUBMODULES** header → **Initialize / update all submodules**.
 * When **cloning**, keep **Also clone submodules (recursive)** ticked in the clone dialog to get everything in one step.
+
+### Working on parent and submodules together
+
+Right-click the **SUBMODULES** header for operations that act on the repository and all its (nested) submodules at once. Each one first checks every repository and, if any would fail, **changes nothing** and lists the problems in a dialog, so you never end up half way.
+
+| Command | What it does | Refused when |
+|---|---|---|
+| **Create branch on repository and all submodules…** | Creates the branch at the current commit of each repository and checks it out everywhere. | the name is invalid or exists in any repository, a submodule is not initialized, a merge/rebase is in progress. |
+| **Check out this branch in all submodules** | Puts every submodule on the branch the top repository is on, instead of the detached recorded commit. Uses the local branch, or creates a tracking branch from the remote one; if the branch is just behind the recorded commit it is fast-forwarded, so the recorded commit is kept. | a submodule has no such branch (local or remote), a submodule is not initialized. |
+| **Commit all (submodules first)…** | Stages everything and commits with the same message in each repository that has changes, deepest submodule first, so the parent records the new submodule commits in the same step. If a commit fails the ones already made are undone (changes stay staged). | empty message, unresolved conflicts, a repository with changes is on a detached HEAD, git user name/email missing. |
+| **Pull all (submodules first)** | Fetches every repository, then pulls the ones that are behind (merge or rebase as set in Settings), submodules first. Uncommitted work in each repository (staged, unstaged, untracked) is parked and put back, as in [pull with work in progress](#pull-with-work-in-progress). Every touched repository keeps an undo point: the blue banner's **Undo sync** returns **all** of them to how they were. If a step fails, those already pulled are put back automatically. | a detached HEAD, a branch without upstream, unresolved conflicts, an earlier sync still waiting for you, remote unreachable, or a merge that would conflict (predicted with a trial merge that writes nothing). Conflicts between your changes and the incoming ones cannot be predicted: they are reported after the pull and Undo sync is there. |
+| **Push all (submodules first)** | Fetches every repository, then pushes the ones that are ahead (or have no upstream, which is set to `origin`), submodules before the parent so the parent never points at unpublished commits. | a repository is behind its upstream (pull first), the remote is unreachable, or a dry-run push shows the remote would reject it. |
+
+Tips: after a plain clone submodules are detached, so run **Check out this branch in all submodules** (or create the branch everywhere) before editing and committing. If a push fails after some repositories were already pushed, the message lists exactly what went out; fix the cause and push again.
 
 Trying to open an uninitialized submodule tells you to initialize it first. Adding a new submodule and changing its URL are still done from the command line (`git submodule add <url> <path>`); the app picks them up on the next refresh.
 

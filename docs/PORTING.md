@@ -18,14 +18,17 @@ implementation (see [PROVENANCE.md](PROVENANCE.md)).
 | Themes (system/light/dark) | Done | persisted |
 | Settings dialog | Done | git path, identity, pull mode, history size |
 | Clone / init | Done | clone dialog, init via folder picker |
-| Cherry-pick / revert / reset / tag (commit context menu) | Done | hard reset asks for confirmation |
+| Cherry-pick / revert / reset / tag (commit context menu) | Done | hard reset asks for confirmation; tag options in a dialog |
 | Merge (default, no-ff, squash) | Done | sidebar context menu |
 | Rebase onto branch, pull --rebase | Done | |
+| Pull keeping work in progress (smart pull) | Done | parks staged/unstaged/untracked changes, pulls, re-applies; banner with Restore / Undo sync / Keep |
 | Interactive rebase (pick/reword/squash/fixup/drop, reorder) | Done | edit/exec/merges not supported |
 | Conflict resolution | Done | banner, marker view, accept ours/theirs, continue/abort; 3-way merge via external tool |
 | External merge/diff tools (Collaterale, Meld, KDiff3, VS Code, custom) | Done | command templates, no shell; folder compare of commits Todo |
 | Blame / file history | Done | right-click a file: blame (at commit or work tree), file history with renames; double-click blame line jumps to commit |
 | Submodules (list, init/update, open, clone recursive) | Done | add/remove/set-url not in UI |
+| Tags (annotated, signed, force, any target, push, delete local/remote) | Done | options dialog; signing relies on the user's git/GPG setup (not tested in CI) |
+| Coordinated submodule operations | Done | same branch, align on branch, commit and push everywhere with pre-flight check; pull everywhere keeping WIP with one global undo, live state in sidebar; not yet: per-submodule commit messages, selecting a subset, `submodule add` UI |
 | Plugins | Todo | design a cross-platform extension API |
 | Shell integration (context menu) | Todo | per-OS: Nautilus/Dolphin, Finder, Explorer |
 | Localization | Todo | reuse upstream .xlf translations |

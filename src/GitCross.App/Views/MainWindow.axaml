@@ -105,7 +105,13 @@
                   <DockPanel IsVisible="{Binding IsHeader}" Margin="0,10,0,2" Background="Transparent">
                     <DockPanel.ContextMenu>
                       <ContextMenu>
+                        <MenuItem Header="Create tag on the current commit…" Click="OnTagCreateHead" IsVisible="{Binding IsTagHeader}" />
                         <MenuItem Header="Initialize / update all submodules" Click="OnSubmoduleUpdateAll" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Create branch on repository and all submodules…" Click="OnSubmoduleBranchAll" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Check out this branch in all submodules" Click="OnSubmoduleAlign" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Commit all (submodules first)…" Click="OnSubmoduleCommitAll" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Pull all (submodules first)" Click="OnSubmodulePullAll" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Push all (submodules first)" Click="OnSubmodulePushAll" IsVisible="{Binding IsSubmoduleHeader}" />
                       </ContextMenu>
                     </DockPanel.ContextMenu>
                     <TextBlock DockPanel.Dock="Right" Text="{Binding Count}" Classes="section" />
@@ -120,6 +126,9 @@
                         <MenuItem Header="Merge (squash into staged changes)" Click="OnSidebarMergeSquash" IsVisible="{Binding IsRefItem}" />
                         <MenuItem Header="Rebase current branch onto this" Click="OnSidebarRebase" IsVisible="{Binding IsRefItem}" />
                         <MenuItem Header="Delete branch" Click="OnSidebarDelete" IsVisible="{Binding IsRefItem}" />
+                        <MenuItem Header="Push tag" Click="OnTagPush" IsVisible="{Binding IsTag}" />
+                        <MenuItem Header="Delete tag" Click="OnTagDelete" IsVisible="{Binding IsTag}" />
+                        <MenuItem Header="Delete tag on remote" Click="OnTagDeleteRemote" IsVisible="{Binding IsTag}" />
                         <MenuItem Header="Open submodule repository" Click="OnSubmoduleOpen" IsVisible="{Binding IsSubmodule}" />
                         <MenuItem Header="Initialize / update this submodule" Click="OnSubmoduleUpdate" IsVisible="{Binding IsSubmodule}" />
                         <MenuItem Header="Apply stash (keep)" Click="OnStashApply" IsVisible="{Binding IsStash}" />
@@ -130,6 +139,7 @@
                     <TextBlock Text="{Binding ., Converter={x:Static c:Converters.SidebarGlyph}}" Width="14" Classes="muted" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                FontWeight="{Binding Ref.IsCurrent, FallbackValue=Normal, Converter={x:Static c:Converters.BoldIf}}" />
+                    <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                   </StackPanel>
                 </Grid>
               </DataTemplate>
@@ -139,6 +149,7 @@
         <GridSplitter Grid.Column="1" Background="Transparent" />
 
         <Grid Grid.Column="2" RowDefinitions="Auto,*,6,*">
+          <StackPanel>
           <Border IsVisible="{Binding HasOperation}" Background="#26D89A1E" BorderBrush="#D89A1E" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,6">
             <DockPanel>
               <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
@@ -148,6 +159,17 @@
               <TextBlock Text="{Binding OperationText, StringFormat='⚠  {0}'}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
             </DockPanel>
           </Border>
+          <Border IsVisible="{Binding HasSmartPull}" Background="#2650A0D8" BorderBrush="#50A0D8" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,6">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+                <Button Classes="accent" Content="Restore my changes" Command="{Binding RestoreWipCommand}" IsVisible="{Binding CanRestoreWip}" />
+                <Button Content="Undo sync" Command="{Binding UndoSyncCommand}" />
+                <Button Content="Keep" Command="{Binding KeepSyncCommand}" IsVisible="{Binding CanKeepSync}" ToolTip.Tip="Forget the undo point" />
+              </StackPanel>
+              <TextBlock Text="{Binding SmartPullText}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </DockPanel>
+          </Border>
+          </StackPanel>
           <Border Grid.Row="1" Classes="panel" ClipToBounds="True">
             <TabControl SelectedIndex="{Binding SelectedTab}">
               <!-- History -->

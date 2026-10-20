@@ -22,6 +22,8 @@ public partial class MainWindow : Window
         InitializeComponent();
         _vm.ApplySavedTheme();
         DataContext = _vm;
+        _vm.Ask = (title, message, ok, hint) => PromptWindow.AskAsync(this, title, message, ok, true, hint);
+        _vm.Inform = async (title, message) => await PromptWindow.AskAsync(this, title, message, "OK");
         _vm.Confirm = async (title, message) => await PromptWindow.AskAsync(this, title, message, "Discard") is not null;
 
         KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.F, KeyModifiers.Control), Command = new FocusSearchCommand(SearchBox) });
@@ -170,16 +172,36 @@ public partial class MainWindow : Window
 
     private async void OnCommitTag(object? s, RoutedEventArgs e)
     {
-        if (ItemOf(s) is not { } i)
+        if (ItemOf(s) is { } i)
         {
-            return;
+            await ShowTagDialogAsync(i.Commit!.Sha);
         }
+    }
 
-        var name = await PromptWindow.AskAsync(this, "Create tag", $"Tag commit {i.ShortSha}", "Create tag", true, "tag name, e.g. v1.2.0");
-        if (name is { Length: > 0 })
+    private async void OnTagCreateHead(object? s, RoutedEventArgs e) => await ShowTagDialogAsync("HEAD");
+
+    private async Task ShowTagDialogAsync(string target)
+    {
+        var dialog = new TagWindow(target, await _vm.GetRemoteNamesAsync(), _vm.ValidateTagAsync);
+        if (await dialog.ShowDialog<TagDialogResult?>(this) is { } r)
         {
-            await _vm.TagAsync(i.Commit!.Sha, name);
+            await _vm.CreateTagAsync(r.Options, r.PushRemote);
         }
+    }
+
+    private async void OnTagPush(object? s, RoutedEventArgs e)
+    {
+        if (RefOf(s) is { } r) { await _vm.PushTagAsync(r); }
+    }
+
+    private async void OnTagDelete(object? s, RoutedEventArgs e)
+    {
+        if (RefOf(s) is { } r) { await _vm.DeleteTagAsync(r); }
+    }
+
+    private async void OnTagDeleteRemote(object? s, RoutedEventArgs e)
+    {
+        if (RefOf(s) is { } r) { await _vm.DeleteRemoteTagAsync(r); }
     }
 
     private async void OnCommitCopy(object? s, RoutedEventArgs e)
@@ -226,6 +248,16 @@ public partial class MainWindow : Window
     }
 
     private void OnSubmoduleUpdateAll(object? s, RoutedEventArgs e) => _vm.UpdateAllSubmodulesCommand.Execute(null);
+
+    private async void OnSubmoduleBranchAll(object? s, RoutedEventArgs e) => await _vm.CreateBranchEverywhereAsync();
+
+    private async void OnSubmoduleAlign(object? s, RoutedEventArgs e) => await _vm.AlignSubmodulesAsync();
+
+    private async void OnSubmoduleCommitAll(object? s, RoutedEventArgs e) => await _vm.CommitEverywhereAsync();
+
+    private async void OnSubmodulePullAll(object? s, RoutedEventArgs e) => await _vm.PullEverywhereAsync();
+
+    private async void OnSubmodulePushAll(object? s, RoutedEventArgs e) => await _vm.PushEverywhereAsync();
 
     private static Core.Models.StashEntry? StashOf(object? sender)
         => (sender as Control)?.DataContext is SidebarEntry { Stash: { } st } ? st : null;

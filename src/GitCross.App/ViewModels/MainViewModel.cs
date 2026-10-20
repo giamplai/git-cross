@@ -28,6 +28,9 @@ public partial class MainViewModel : ObservableObject
     private IReadOnlyList<GitRef> _refs = [];
     private IReadOnlyList<StashEntry> _stashes = [];
     private IReadOnlyList<SubmoduleInfo> _submodules = [];
+    private IReadOnlyDictionary<string, TagInfo> _tagInfo = new Dictionary<string, TagInfo>();
+    private int _subSyncCount; // submodules holding an undo point of a coordinated pull
+    private IReadOnlyDictionary<string, SubmoduleLiveStatus> _subLive = new Dictionary<string, SubmoduleLiveStatus>();
     private readonly Stack<string> _parents = new(); // superprojects we descended from; lets "Back" return
     private string? _fileFilter; // when set, history lists only commits touching this file
     private string? _detailSha; // commit or stash whose files are listed
@@ -68,6 +71,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _graphWidth = 40;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasOperation)), NotifyPropertyChangedFor(nameof(OperationText))] private GitOperation _operation;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(OperationText)), NotifyPropertyChangedFor(nameof(CanContinue))] private int _conflictCount;
+    [ObservableProperty] private SmartPullState? _smartPull;
     [ObservableProperty] private string _blameTitle = "";
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasFileFilter)), NotifyPropertyChangedFor(nameof(FileFilterText))] private string? _fileFilterPath;
     [ObservableProperty] private ThemeVariant _themeVariant = ThemeVariant.Default;
@@ -95,6 +99,25 @@ public partial class MainViewModel : ObservableObject
         GitOperation.Revert => "Revert",
         GitOperation.Rebase => "Rebase",
         _ => "Merge",
+    };
+
+    public bool HasSmartPull => SmartPull is not null || _subSyncCount > 0;
+    public bool CanRestoreWip => SmartPull is { IsPending: true } && !HasOperation;
+    public bool CanKeepSync => HasSmartPull && SmartPull is not { IsPending: true };
+    public string SmartPullText => _subSyncCount > 0 && SmartPull is not { IsPending: true }
+        ? ConflictCount > 0
+            ? $"↺  Synced {_subSyncCount + (SmartPull is null ? 0 : 1)} repositories, but re-applying your changes left conflicts. Resolve them, or undo the sync in all of them."
+            : $"↺  Synced {_subSyncCount + (SmartPull is null ? 0 : 1)} repositories with their upstream. Undo returns all of them to how they were."
+        : SmartPull switch
+    {
+        null => "",
+        { IsPending: true } => HasOperation
+            ? "↺  Your uncommitted changes are parked safely while the pull is finished."
+            : "↺  Pull finished. Your uncommitted changes are parked: restore them now.",
+        { WipRestored: true } when ConflictCount > 0
+            => $"↺  Synced, but re-applying your changes left {ConflictCount} conflicted file{(ConflictCount == 1 ? "" : "s")}. Resolve them, or undo the sync.",
+        { WipRestored: true } => "↺  Synced with the upstream and your changes are back. Undo returns to how things were before.",
+        _ => "↺  Synced with the upstream. Undo returns to how things were before.",
     };
 
     public bool HasFileFilter => FileFilterPath is not null;
@@ -152,6 +175,12 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>Supplied by the view to ask before destructive actions (title, message → confirmed). Unset = proceed.</summary>
     public Func<string, string, Task<bool>>? Confirm { get; set; }
+
+    /// <summary>Supplied by the view: asks for one line of text (title, message, ok text, placeholder → text). Null = cancelled/unset.</summary>
+    public Func<string, string, string, string, Task<string?>>? Ask { get; set; }
+
+    /// <summary>Supplied by the view: shows a message the user must read (title, message).</summary>
+    public Func<string, string, Task>? Inform { get; set; }
 
     private async Task<bool> ConfirmAsync(string title, string message)
         => Confirm is null || await Confirm(title, message);
@@ -364,8 +393,11 @@ public partial class MainViewModel : ObservableObject
             var statusTask = repo.GetStatusAsync();
             var stashTask = repo.GetStashesAsync();
             var subTask = repo.GetSubmodulesAsync();
-            await Task.WhenAll(commitsTask, refsTask, statusTask, stashTask, subTask);
+            var tagTask = repo.GetTagInfoAsync();
+            await Task.WhenAll(commitsTask, refsTask, statusTask, stashTask, subTask, tagTask);
+            _tagInfo = tagTask.Result;
             _submodules = subTask.Result;
+            _subLive = _submodules.Count > 0 ? await repo.GetSubmoduleLiveStatusesAsync() : _subLive;
             var (commits, refs, status) = (commitsTask.Result, refsTask.Result, statusTask.Result);
             _stashes = stashTask.Result;
             var op = await repo.GetOperationAsync();
@@ -381,6 +413,12 @@ public partial class MainViewModel : ObservableObject
             }
 
             Operation = op;
+            SmartPull = await repo.GetSmartPullStateAsync();
+            _subSyncCount = _submodules.Count > 0 ? (await repo.GetSyncStatesAsync()).Count(x => !x.Member.IsRoot) : 0;
+            OnPropertyChanged(nameof(HasSmartPull));
+            OnPropertyChanged(nameof(CanRestoreWip));
+            OnPropertyChanged(nameof(CanKeepSync));
+            OnPropertyChanged(nameof(SmartPullText));
 
             BranchText = status.Branch ?? "detached HEAD";
             SyncText = status.Ahead + status.Behind > 0 ? $"↑{status.Ahead}  ↓{status.Behind}" : "";
@@ -441,6 +479,9 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    private string? TagNote(string name)
+        => _tagInfo.TryGetValue(name, out var t) ? (t.Annotated ? "Annotated tag" + (t.Message.Length > 0 ? ": " + t.Message : "") : "Lightweight tag") : null;
+
     private void BuildSidebar(IReadOnlyList<GitRef> refs)
     {
         Sidebar.Clear();
@@ -455,7 +496,7 @@ public partial class MainViewModel : ObservableObject
             Sidebar.Add(new SidebarEntry(title, IsHeader: true, Count: items.Count.ToString()));
             foreach (var r in items)
             {
-                Sidebar.Add(new SidebarEntry(r.Name, r));
+                Sidebar.Add(new SidebarEntry(r.Name, r, Note: kind == RefKind.Tag ? TagNote(r.Name) : null));
             }
         }
 
@@ -468,7 +509,7 @@ public partial class MainViewModel : ObservableObject
             Sidebar.Add(new SidebarEntry("SUBMODULES", IsHeader: true, Count: _submodules.Count.ToString()));
             foreach (var m in _submodules)
             {
-                Sidebar.Add(new SidebarEntry(m.Path, Submodule: m));
+                Sidebar.Add(new SidebarEntry(m.Path, Submodule: m, Live: _subLive.GetValueOrDefault(m.Path)));
             }
         }
 
@@ -906,7 +947,85 @@ public partial class MainViewModel : ObservableObject
 
     [RelayCommand] private Task FetchAsync() => Mutate(() => _repo!.FetchAsync(), true);
 
-    [RelayCommand] private Task PullRebaseAsync() => Mutate(() => _repo!.PullAsync(rebase: true), true);
+    [RelayCommand] private Task PullRebaseAsync() => SyncAsync(rebase: true);
+
+    /// <summary>Pull; with uncommitted work it parks it, pulls, re-applies it and keeps an undo point (see GitRepository.SmartPullAsync).</summary>
+    private async Task SyncAsync(bool rebase)
+    {
+        if (_repo is not { } repo)
+        {
+            return;
+        }
+
+        if (Unstaged.Count + Staged.Count == 0)
+        {
+            await Mutate(() => repo.PullAsync(rebase), true);
+            return;
+        }
+
+        SmartPullOutcome? outcome = null;
+        await Mutate(async () =>
+        {
+            if (await repo.GetSmartPullStateAsync() is { IsPending: false })
+            {
+                await repo.DiscardSmartPullAsync(); // a new sync supersedes the previous undo point
+            }
+
+            outcome = await repo.SmartPullAsync(rebase);
+        }, true);
+        ReportSync(outcome);
+    }
+
+    private void ReportSync(SmartPullOutcome? outcome)
+    {
+        switch (outcome)
+        {
+            case SmartPullOutcome.Clean:
+                IsError = false;
+                StatusText = "Pulled, and your changes are back in place. Use Undo sync to go back.";
+                break;
+            case SmartPullOutcome.WipConflicts:
+                SelectedTab = 1;
+                Fail("Pulled, but your changes conflict with the incoming ones: resolve the marked files, or Undo sync.");
+                break;
+            case SmartPullOutcome.PullConflicts:
+                Fail("The pull stopped on conflicts. Your changes are parked: resolve, Continue, then Restore my changes (or Undo sync).");
+                break;
+        }
+    }
+
+    [RelayCommand]
+    private async Task RestoreWipAsync()
+    {
+        if (_repo is not { } repo)
+        {
+            return;
+        }
+
+        SmartPullOutcome? outcome = null;
+        await Mutate(async () => outcome = await repo.RestoreWipAsync(), true);
+        ReportSync(outcome);
+    }
+
+    [RelayCommand]
+    private async Task UndoSyncAsync()
+    {
+        if (_repo is { } repo
+            && await ConfirmAsync("Undo sync", "Go back to before the pull? Every synced repository (submodules included) returns to its previous commit and your uncommitted changes are restored as they were. Anything changed since the sync is lost."))
+        {
+            await SyncOpAsync(async r =>
+            {
+                await r.UndoEverywhereAsync();
+                return "Sync undone: branches and uncommitted changes are back to how they were.";
+            });
+        }
+    }
+
+    [RelayCommand] private Task KeepSyncAsync() => SyncOpAsync(async r =>
+    {
+        await r.KeepEverywhereAsync();
+        return "Undo point forgotten.";
+    });
 
     public async Task MergeWithAsync(GitRef r, MergeMode mode)
     {
@@ -944,9 +1063,9 @@ public partial class MainViewModel : ObservableObject
 
     public string CurrentBranch => BranchText;
 
-    [RelayCommand] private Task PullAsync() => Mutate(() => _repo!.PullAsync(rebase: _settings.PullRebase), true);
+    [RelayCommand] private Task PullAsync() => SyncAsync(_settings.PullRebase);
 
-    [RelayCommand] private Task PullMergeAsync() => Mutate(() => _repo!.PullAsync(rebase: false), true);
+    [RelayCommand] private Task PullMergeAsync() => SyncAsync(rebase: false);
 
     [RelayCommand] private Task PushAsync() => Mutate(() => _repo!.PushAsync(), true);
 
@@ -1020,6 +1139,111 @@ public partial class MainViewModel : ObservableObject
         await OpenCoreAsync(target, remember: false);
     }
 
+    /// <summary>Runs a coordinated submodule operation. Pre-flight problems are shown in a dialog because nothing was changed.</summary>
+    private async Task SyncOpAsync(Func<GitRepository, Task<string>> op)
+    {
+        if (_repo is not { } repo)
+        {
+            return;
+        }
+
+        string? summary = null;
+        string? stopped = null;
+        string? title = null;
+        try
+        {
+            await Guard(async () => summary = await op(repo));
+        }
+        catch (SyncPreflightException ex)
+        {
+            (title, stopped) = ("Nothing was changed", ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            (title, stopped) = ("Operation stopped", ex.Message);
+        }
+
+        await RefreshAsync();
+        if (stopped is not null)
+        {
+            Fail(stopped.Split('\n')[0]);
+            if (Inform is not null)
+            {
+                await Inform(title!, stopped);
+            }
+        }
+        else if (summary is not null && !IsError)
+        {
+            StatusText = summary;
+        }
+    }
+
+    /// <summary>Creates the same branch on this repository and all its submodules and checks it out everywhere.</summary>
+    public async Task CreateBranchEverywhereAsync()
+    {
+        if (Ask is null || await Ask("New branch everywhere", "Creates the branch in this repository and in every submodule (at their current commits) and checks it out in all of them. Nothing is changed unless every repository can do it.", "Create", "branch name, e.g. feature/login") is not { Length: > 0 } name)
+        {
+            return;
+        }
+
+        await SyncOpAsync(async r =>
+        {
+            await r.CreateBranchEverywhereAsync(name);
+            return $"Branch '{name}' created and checked out in the repository and all submodules.";
+        });
+    }
+
+    /// <summary>Checks out the branch of this repository in every submodule (instead of the detached recorded commit).</summary>
+    public Task AlignSubmodulesAsync()
+        => SyncOpAsync(async r =>
+        {
+            var branch = await r.GetCurrentBranchAsync() ?? throw new InvalidOperationException("This repository is on a detached HEAD: check out a branch first.");
+            await r.AlignSubmodulesToBranchAsync(branch);
+            return $"Submodules are now on branch '{branch}'.";
+        });
+
+    /// <summary>Commits all changes with one message, submodules first so this repository records their new commits.</summary>
+    public async Task CommitEverywhereAsync()
+    {
+        if (Ask is null || await Ask("Commit everywhere", "Stages and commits ALL changes with the same message in every submodule that has changes and then in this repository (which records the new submodule commits).", "Commit all", "commit message") is not { Length: > 0 } message)
+        {
+            return;
+        }
+
+        await SyncOpAsync(async r =>
+        {
+            var done = await r.CommitEverywhereAsync(message);
+            return done.Count == 0 ? "Nothing to commit." : $"Committed in: {string.Join(", ", done)}.";
+        });
+    }
+
+    /// <summary>Pulls the submodules and then this repository keeping uncommitted work, after checking all of them (upstream, predicted conflicts); one Undo covers all.</summary>
+    public async Task PullEverywhereAsync()
+    {
+        var conflicts = false;
+        await SyncOpAsync(async r =>
+        {
+            var steps = await r.PullEverywhereAsync(_settings.PullRebase);
+            conflicts = steps.Any(x => x.Outcome == SmartPullOutcome.WipConflicts);
+            return steps.Count == 0
+                ? "Everything is already up to date."
+                : $"Pulled: {string.Join(", ", steps.Select(x => $"{x.Path} ({x.Commits})"))}. Undo sync goes back.";
+        });
+        if (conflicts && !IsError)
+        {
+            SelectedTab = 1;
+            Fail("Pulled, but your changes conflict with the incoming ones in some repository: resolve the marked files, or Undo sync.");
+        }
+    }
+
+    /// <summary>Pushes the submodules and then this repository, after checking all of them (fetch, behind, dry-run).</summary>
+    public Task PushEverywhereAsync()
+        => SyncOpAsync(async r =>
+        {
+            var done = await r.PushEverywhereAsync();
+            return done.Count == 0 ? "Everything is already pushed." : $"Pushed: {string.Join(", ", done)}.";
+        });
+
     public Task UpdateSubmoduleAsync(SubmoduleInfo sub) => Mutate(() => _repo!.SubmoduleUpdateAsync(sub.Path), sub);
 
     [RelayCommand]
@@ -1037,7 +1261,56 @@ public partial class MainViewModel : ObservableObject
 
     public Task ResetToAsync(string sha, ResetMode mode) => Mutate(() => _repo!.ResetAsync(sha, mode), sha);
 
-    public Task TagAsync(string sha, string name) => Mutate(() => _repo!.CreateTagAsync(name, sha), sha);
+    public Task<string?> ValidateTagAsync(TagOptions o) => _repo is { } r ? r.ValidateTagAsync(o) : Task.FromResult<string?>(null);
+
+    public async Task<IReadOnlyList<string>> GetRemoteNamesAsync() => _repo is { } r ? await r.GetRemotesAsync() : [];
+
+    /// <summary>Creates a tag (lightweight, annotated or signed) and optionally pushes it to <paramref name="pushRemote"/>.</summary>
+    public Task CreateTagAsync(TagOptions o, string? pushRemote)
+        => Mutate(async () =>
+        {
+            await _repo!.CreateTagAsync(o);
+            if (pushRemote is not null)
+            {
+                await _repo.PushTagAsync(o.Name, pushRemote, o.Force);
+            }
+        }, o);
+
+    public async Task DeleteTagAsync(GitRef tag)
+    {
+        if (await ConfirmAsync("Delete tag", $"Delete the local tag '{tag.Name}'? Commits are not affected; a tag already pushed stays on the remote."))
+        {
+            await Mutate(() => _repo!.DeleteTagAsync(tag.Name), tag);
+        }
+    }
+
+    public async Task PushTagAsync(GitRef tag)
+    {
+        var remotes = await GetRemoteNamesAsync();
+        var remote = remotes.Contains("origin") ? "origin" : remotes.FirstOrDefault();
+        if (remote is null)
+        {
+            Fail("This repository has no remote to push the tag to.");
+            return;
+        }
+
+        await Mutate(async () =>
+        {
+            await _repo!.PushTagAsync(tag.Name, remote);
+            StatusText = $"Tag '{tag.Name}' pushed to {remote}.";
+        }, tag);
+    }
+
+    public async Task DeleteRemoteTagAsync(GitRef tag)
+    {
+        var remotes = await GetRemoteNamesAsync();
+        var remote = remotes.Contains("origin") ? "origin" : remotes.FirstOrDefault();
+        if (remote is not null
+            && await ConfirmAsync("Delete remote tag", $"Delete the tag '{tag.Name}' on '{remote}'? Everyone who fetched it keeps their copy, but it disappears for new clones."))
+        {
+            await Mutate(() => _repo!.DeleteRemoteTagAsync(tag.Name, remote), tag);
+        }
+    }
 
     public Task CheckoutShaAsync(string sha) => Mutate(() => _repo!.CheckoutAsync(sha), sha);
 
