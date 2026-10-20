@@ -204,7 +204,7 @@ public sealed partial class GitRepository
         await ClearSmartPullAsync();
     }
 
-    private async Task<string> HeadShaAsync() => (await _git.OutAsync("rev-parse", "HEAD")).Trim();
+    internal async Task<string> HeadShaAsync() => (await _git.OutAsync("rev-parse", "HEAD")).Trim();
 
     private async Task<string?> StashTopAsync()
     {

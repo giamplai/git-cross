@@ -28,6 +28,7 @@ implementation (see [PROVENANCE.md](PROVENANCE.md)).
 | Blame / file history | Done | right-click a file: blame (at commit or work tree), file history with renames; double-click blame line jumps to commit |
 | Submodules (list, init/update, open, clone recursive) | Done | add/remove/set-url not in UI |
 | Advanced tag creation | Todo | tag creation is too basic (name only, lightweight): add annotated tags (message), signed tags, force, tag a chosen commit/ref with options dialog, delete/push tags |
+| Coordinated submodule operations | Done | same branch, align on branch, commit and push everywhere with pre-flight check; pull everywhere keeping WIP with one global undo, live state in sidebar; not yet: per-submodule commit messages, selecting a subset, `submodule add` UI |
 | Plugins | Todo | design a cross-platform extension API |
 | Shell integration (context menu) | Todo | per-OS: Nautilus/Dolphin, Finder, Explorer |
 | Localization | Todo | reuse upstream .xlf translations |

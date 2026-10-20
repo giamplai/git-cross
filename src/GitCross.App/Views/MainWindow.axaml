@@ -106,6 +106,11 @@
                     <DockPanel.ContextMenu>
                       <ContextMenu>
                         <MenuItem Header="Initialize / update all submodules" Click="OnSubmoduleUpdateAll" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Create branch on repository and all submodules…" Click="OnSubmoduleBranchAll" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Check out this branch in all submodules" Click="OnSubmoduleAlign" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Commit all (submodules first)…" Click="OnSubmoduleCommitAll" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Pull all (submodules first)" Click="OnSubmodulePullAll" IsVisible="{Binding IsSubmoduleHeader}" />
+                        <MenuItem Header="Push all (submodules first)" Click="OnSubmodulePushAll" IsVisible="{Binding IsSubmoduleHeader}" />
                       </ContextMenu>
                     </DockPanel.ContextMenu>
                     <TextBlock DockPanel.Dock="Right" Text="{Binding Count}" Classes="section" />
@@ -130,6 +135,7 @@
                     <TextBlock Text="{Binding ., Converter={x:Static c:Converters.SidebarGlyph}}" Width="14" Classes="muted" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                FontWeight="{Binding Ref.IsCurrent, FallbackValue=Normal, Converter={x:Static c:Converters.BoldIf}}" />
+                    <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                   </StackPanel>
                 </Grid>
               </DataTemplate>

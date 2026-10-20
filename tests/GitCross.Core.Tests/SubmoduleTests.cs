@@ -3,6 +3,8 @@ using GitCross.Core.Submodules;
 
 namespace GitCross.Core.Tests;
 
+// Both classes set process-wide environment variables (FileTransportScope): they must not run in parallel.
+[Collection("process-environment")]
 public class SubmoduleTests
 {
     private const string Sha = "36a827c287fe147d0b589d2e666657fef28be6d0";
@@ -30,7 +32,7 @@ public class SubmoduleTests
     /// Recent git refuses file:// submodule transports unless allowed, and a submodule checkout has no repository-level identity
     /// (CI machines have no global one either). Both are scoped to this test via environment variables.
     /// </summary>
-    private sealed class FileTransportScope : IDisposable
+    internal sealed class FileTransportScope : IDisposable
     {
         private static readonly Dictionary<string, string> Vars = new()
         {
