@@ -1,6 +1,6 @@
 name: CI
 on:
-  push: { branches: [main] }
+  push: { branches: [main, develop] }
   pull_request:
 jobs:
   build-and-core-tests:
