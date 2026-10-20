@@ -1,10 +1,17 @@
 # Releasing
 
-1. Make sure `main` is green: `scripts/check.sh`.
-2. Bump `<Version>` in `Directory.Build.props` (semantic versioning) and describe the changes in `CHANGELOG.md`.
-3. Commit: `git commit -am "chore: release 0.2.0"`.
-4. Tag and push: `git tag v0.2.0 && git push origin main v0.2.0`.
-5. The **Release** workflow (`.github/workflows/release.yml`) checks that the tag matches the version, runs the Core tests, builds every package and attaches them to a GitHub release together with `SHA256SUMS`.
+Releases follow git-flow (see CONTRIBUTING.md): `develop` is integrated continuously, `main` only receives releases.
+
+1. Make sure `develop` is green: `scripts/check.sh` and CI.
+2. Cut the release branch: `git checkout -b release/0.2.0 develop`.
+3. On it, bump `<Version>` in `Directory.Build.props` (semantic versioning: `feat` → minor, `fix` → patch, breaking → major) and
+   turn **Unreleased** in `CHANGELOG.md` into the new version with its date. Only release fixes go on this branch.
+4. Commit `chore: release 0.2.0` and open a pull request `release/0.2.0` → `main`; merge it with a **merge commit** (no squash, so the history stays connected).
+5. Tag the merge commit on `main` and push the tag: `git tag v0.2.0 origin/main && git push origin v0.2.0`.
+6. The **Release** workflow (`.github/workflows/release.yml`) checks that the tag matches the version, runs the Core tests, builds every package and attaches them to a GitHub release together with `SHA256SUMS`.
+7. Merge `main` back into `develop` (pull request `main` → `develop`) so the version bump and changelog are not lost.
+
+Urgent fix of a released version: `hotfix/0.2.1` from `main`, bump the patch version and changelog, pull request into `main`, tag, then merge back into `develop`.
 
 ## Building packages locally
 ```bash

@@ -28,7 +28,7 @@ More detail (layout, conventions, how the tests and screenshots work): [docs/DEV
 
 ## Making a change
 
-1. **Fork** and create a topic branch from `main` (`feature/short-name` or `fix/short-name`).
+1. **Fork** and create a topic branch from `develop` (`feature/short-name` or `fix/short-name`) and open the pull request against `develop`. See *Branching (git-flow)* below.
 2. **Write the change with tests.**
    * Anything that parses git output → a pure test in `tests/GitCross.Core.Tests` with sample text.
    * Anything that runs git → an integration test using the `TempRepo` helper (real temporary repositories).
@@ -73,3 +73,15 @@ This project is released under the [MIT License](LICENSE.md) and is an independe
 
 The maintainer ([@giamplai](https://github.com/giamplai)) reviews pull requests; expect questions rather than silence. Releases are
 tagged `vX.Y.Z` and built by the release workflow — see [docs/RELEASING.md](docs/RELEASING.md).
+
+## Branching (git-flow)
+| Branch | Purpose | Created from → merged into |
+|---|---|---|
+| `main` | Released code only; every commit is a release, tagged `vX.Y.Z`. | |
+| `develop` | Integration branch for the next release; all pull requests target it. | |
+| `feature/*`, `fix/*` | One change each. | `develop` → `develop` |
+| `release/X.Y.Z` | Version bump, changelog and last fixes before a release. | `develop` → `main` (tagged) and back into `develop` |
+| `hotfix/*` | Urgent fix of a released version (or of CI on `main`). | `main` → `main` and `develop` |
+
+Commits follow Conventional Commits; the version follows semantic versioning (`feat` → minor, `fix` → patch, breaking change → major).
+Dependabot pull requests target `develop`. Details of a release are in [docs/RELEASING.md](docs/RELEASING.md).
