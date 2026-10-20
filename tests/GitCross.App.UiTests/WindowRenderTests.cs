@@ -128,8 +128,9 @@ public class WindowRenderTests
         Assert.True(await vm.OpenAsync(repo));
         var tip = vm.Items.First(i => !i.IsWorkingDir);
 
-        await vm.TagAsync(tip.Commit!.Sha, "rc1");
+        await vm.CreateTagAsync(new Core.Git.TagOptions("rc1", tip.Commit!.Sha, "Release candidate 1"), null);
         Assert.Contains(vm.Items, i => i.Labels.Any(l => l.Text == "rc1"));
+        Assert.Equal("Annotated tag: Release candidate 1", vm.Sidebar.Single(e => e.Ref?.Name == "rc1").Tip);
 
         var before = vm.Items.Count;
         await vm.ResetToAsync(vm.Items.Last().Commit!.Sha, Core.Git.ResetMode.Mixed);
@@ -685,6 +686,14 @@ public class WindowRenderTests
         await Settle();
         Shot(clone, "clone-dialog.png");
         clone.Close();
+
+        var tag = new TagWindow("1b39b6d", ["origin"], null);
+        tag.Show();
+        tag.FindControl<TextBox>("NameBox")!.Text = "v1.2.0";
+        tag.FindControl<TextBox>("MessageBox")!.Text = "Release 1.2.0: coordinated submodule operations";
+        await Settle();
+        Shot(tag, "tag-dialog.png");
+        tag.Close();
 
         var confirm = new PromptWindow("Hard reset", "Move the current branch to 1b39b6d and DISCARD all uncommitted changes? This cannot be undone.", "Hard reset", false);
         confirm.Show();

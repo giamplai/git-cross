@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="GitCross.App.Views.TagWindow"
+        Title="Create tag" Width="520" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner">
+  <StackPanel Margin="24" Spacing="12">
+    <TextBlock Text="Create tag" FontSize="20" FontWeight="Bold" />
+    <StackPanel Spacing="4">
+      <TextBlock Text="Tag name" Classes="section" />
+      <TextBox x:Name="NameBox" PlaceholderText="e.g. v1.2.0" />
+    </StackPanel>
+    <StackPanel Spacing="4">
+      <TextBlock Text="Tag this commit or reference" Classes="section" />
+      <TextBox x:Name="TargetBox" PlaceholderText="HEAD" />
+    </StackPanel>
+    <StackPanel Spacing="4">
+      <TextBlock Text="Message (makes it an annotated tag)" Classes="section" />
+      <TextBox x:Name="MessageBox" AcceptsReturn="True" TextWrapping="Wrap" Height="90" PlaceholderText="Leave empty for a lightweight tag (just a name)" />
+    </StackPanel>
+    <CheckBox x:Name="SignBox" Content="Sign the tag (needs GPG or SSH signing configured in git; requires a message)" />
+    <CheckBox x:Name="ForceBox" Content="Replace the tag if it already exists" />
+    <CheckBox x:Name="PushBox" Content="Push to remote after creating" />
+    <TextBlock x:Name="ErrorText" Foreground="#E5484D" TextWrapping="Wrap" IsVisible="False" />
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+      <Button Content="Cancel" Click="OnCancel" />
+      <Button Classes="accent" Content="Create tag" Padding="18,6" Click="OnCreate" IsDefault="True" />
+    </StackPanel>
+  </StackPanel>
+</Window>

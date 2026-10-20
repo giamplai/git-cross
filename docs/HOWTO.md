@@ -178,7 +178,7 @@ Right-click any commit:
 | Item | Effect |
 |---|---|
 | **Checkout this commit** | Detached-HEAD checkout of that commit. |
-| **Create tag here…** | Asks for a tag name, then creates a lightweight tag on that commit. |
+| **Create tag here…** | Opens the tag dialog for that commit ([section 10](#10-branches-and-tags)): lightweight, annotated or signed tag. |
 | **Cherry-pick onto current branch** | Applies that commit on top of the current branch (see [section 13](#13-cherry-pick-revert-reset)). |
 | **Revert this commit** | Creates a new commit that undoes it (merge commits are reverted against their first parent). |
 | **Interactive rebase onto this commit…** | Opens the interactive rebase dialog for the commits *after* the one you clicked ([section 10b](#10b-interactive-rebase)). |
@@ -287,8 +287,24 @@ If there is nothing staged or the message is empty, the status bar says so and n
 | Combine a branch into one commit | **Merge (squash into staged changes)** — brings the branch's changes into your index without committing and opens the **Commit** tab; write a message and commit. No merge relationship is recorded. |
 | Put your branch on top of another | **Rebase current branch onto this** — replays the *current* branch's commits after the selected branch, giving a linear history. Asks for confirmation because it rewrites the current branch's commits (avoid on branches you already pushed and others use). Conflicts show the banner of section 15; **Continue** moves to the next commit. |
 | Delete a branch | Right-click → **Delete branch** (safe delete only; the current branch cannot be deleted). |
-| Create a tag | Right-click a commit → **Create tag here…**. |
+| Create a tag | Right-click a commit → **Create tag here…**, or right-click the **TAGS** header → **Create tag on the current commit…**. See below. |
 | Check out a tag | Double-click it (detached HEAD). |
+| Push / delete a tag | Right-click the tag → **Push tag** (to `origin`, or the first remote), **Delete tag** (local only) or **Delete tag on remote** (both ask for confirmation where data is removed). |
+
+### The tag dialog
+
+![Tag dialog](images/tag-dialog.png)
+
+| Field | Meaning |
+|---|---|
+| **Tag name** | Must be a valid git reference name (no spaces, `~`, `^`, `:`…). Checked before anything is created. |
+| **Tag this commit or reference** | Pre-filled with the commit you right-clicked (or `HEAD`); you can type another commit, branch or tag. |
+| **Message** | Leave empty for a **lightweight** tag (just a name). With a message the tag is **annotated**: it records who made it, when, and your text, which is what releases normally use. |
+| **Sign the tag** | Creates a signed tag; needs GPG or SSH signing set up in git, and a message. |
+| **Replace the tag if it already exists** | Moves an existing tag (`-f`). Without it an existing name is refused. Pushing a moved tag that was already published also needs the remote to accept it. |
+| **Push to remote after creating** | Shown when the repository has a remote; pushes just this tag. |
+
+Hovering a tag in the sidebar tells you whether it is annotated and shows the first line of its message.
 
 If a checkout would overwrite uncommitted changes, git refuses and the message appears in red in the status bar; stash or commit first.
 

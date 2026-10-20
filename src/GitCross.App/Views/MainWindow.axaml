@@ -105,6 +105,7 @@
                   <DockPanel IsVisible="{Binding IsHeader}" Margin="0,10,0,2" Background="Transparent">
                     <DockPanel.ContextMenu>
                       <ContextMenu>
+                        <MenuItem Header="Create tag on the current commit…" Click="OnTagCreateHead" IsVisible="{Binding IsTagHeader}" />
                         <MenuItem Header="Initialize / update all submodules" Click="OnSubmoduleUpdateAll" IsVisible="{Binding IsSubmoduleHeader}" />
                         <MenuItem Header="Create branch on repository and all submodules…" Click="OnSubmoduleBranchAll" IsVisible="{Binding IsSubmoduleHeader}" />
                         <MenuItem Header="Check out this branch in all submodules" Click="OnSubmoduleAlign" IsVisible="{Binding IsSubmoduleHeader}" />
@@ -125,6 +126,9 @@
                         <MenuItem Header="Merge (squash into staged changes)" Click="OnSidebarMergeSquash" IsVisible="{Binding IsRefItem}" />
                         <MenuItem Header="Rebase current branch onto this" Click="OnSidebarRebase" IsVisible="{Binding IsRefItem}" />
                         <MenuItem Header="Delete branch" Click="OnSidebarDelete" IsVisible="{Binding IsRefItem}" />
+                        <MenuItem Header="Push tag" Click="OnTagPush" IsVisible="{Binding IsTag}" />
+                        <MenuItem Header="Delete tag" Click="OnTagDelete" IsVisible="{Binding IsTag}" />
+                        <MenuItem Header="Delete tag on remote" Click="OnTagDeleteRemote" IsVisible="{Binding IsTag}" />
                         <MenuItem Header="Open submodule repository" Click="OnSubmoduleOpen" IsVisible="{Binding IsSubmodule}" />
                         <MenuItem Header="Initialize / update this submodule" Click="OnSubmoduleUpdate" IsVisible="{Binding IsSubmodule}" />
                         <MenuItem Header="Apply stash (keep)" Click="OnStashApply" IsVisible="{Binding IsStash}" />
